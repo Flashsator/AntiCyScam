@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Backup is disabled at the application level (android:allowBackup="false")
+  for the anti-fraud use case: bound apps + transfer accounts are sensitive
+  and must not be silently restored across devices.
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="database" path="." />
+</full-backup-content>

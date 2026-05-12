@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">反詐器</string>
+
+    <!-- Bottom navigation -->
+    <string name="nav_main">反詐器</string>
+    <string name="nav_scam_info">詐騙專區</string>
+    <string name="nav_setting">設定</string>
+
+    <!-- Accessibility gate (Phase 2) -->
+    <string name="gate_title">請啟用無障礙服務</string>
+    <string name="gate_subtitle">反詐器需要無障礙服務才能保護您的轉帳安全</string>
+    <string name="gate_reason">為了在您打開網銀／支付類 App 時提醒您，反詐器必須在「設定 → 無障礙」中啟用。未啟用前無法進入。</string>
+    <string name="gate_open_settings">前往無障礙設定</string>
+    <string name="gate_status_disabled">尚未啟用</string>
+    <string name="gate_status_enabled">已啟用</string>
+
+    <!-- Bind / unbind apps (Phase 4) -->
+    <string name="bind_apps_button">綁定／解除 APP</string>
+
+    <!-- Transfer accounts (Phase 5) -->
+    <string name="transfer_default_name">臨時用</string>
+    <string name="transfer_default_purpose">預設帳號</string>
+    <string name="transfer_add_title">新增轉帳帳號</string>
+    <string name="transfer_max_reached">最多只能新增 5 筆轉帳帳號</string>
+    <string name="transfer_field_name">姓名／用途</string>
+    <string name="transfer_field_account">轉帳帳號</string>
+    <string name="transfer_action_save">儲存</string>
+    <string name="transfer_action_cancel">取消</string>
+    <string name="transfer_copied">已複製帳號至剪貼簿</string>
+
+    <!-- Warning (Phase 8) -->
+    <string name="warning_title">請從反詐器進入</string>
+    <string name="warning_body">為了避免您轉帳到錯誤的帳戶，請回到反詐器並從反詐器內進入此 App。</string>
+    <string name="warning_confirm">我知道了</string>
+
+    <!-- Accessibility service (Phase 7) -->
+    <string name="accessibility_service_label">反詐器保護服務</string>
+    <string name="accessibility_service_description">當您嘗試打開已綁定的 App（例如網銀）卻不是從反詐器進入時，反詐器會跳出警告並把您帶回反詐器確認。此服務不會收集您的任何個人資料。</string>
+</resources>

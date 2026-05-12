@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  反詐器 launcher 前景：紅色盾牌 + 內含警示驚嘆號。
+  Vector 設計，可隨 adaptive icon scale。
+  Viewport 108x108 是 adaptive icon 標準，安全區為 中心 72x72。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Shield outline -->
+    <path
+        android:fillColor="#D32F2F"
+        android:pathData="M54,20 L82,30 L82,58 C82,72 70,84 54,90 C38,84 26,72 26,58 L26,30 Z" />
+    <!-- Inner darker shield border -->
+    <path
+        android:fillColor="#B71C1C"
+        android:pathData="M54,28 L75,36 L75,58 C75,69 65,78 54,83 C43,78 33,69 33,58 L33,36 Z" />
+    <!-- Exclamation mark stem -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M51,40 L57,40 L56,62 L52,62 Z" />
+    <!-- Exclamation mark dot -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,68 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+</vector>

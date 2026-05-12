@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Splash/host theme. Compose owns the actual UI; this only controls
+         initial window background + system bars so the first frame is black,
+         not white. -->
+    <style name="Theme.AntiCyScam" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/surface_black</item>
+        <item name="android:statusBarColor">@color/surface_black</item>
+        <item name="android:navigationBarColor">@color/surface_black</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    </style>
+
+    <!-- Theme used by the blocking warning Activity (Phase 8).
+         Fullscreen + translucent system bars to cover everything possible. -->
+    <style name="Theme.AntiCyScam.FullscreenWarning" parent="Theme.AntiCyScam">
+        <item name="android:windowBackground">@color/warning_red_dark</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:statusBarColor">@color/warning_red_dark</item>
+        <item name="android:navigationBarColor">@color/warning_red_dark</item>
+        <item name="android:windowShowWallpaper">false</item>
+    </style>
+
+</resources>

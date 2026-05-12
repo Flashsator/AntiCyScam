@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Accessibility service configuration. Phase 1 lays down a minimal config so
+  the manifest validates and the gate screen can detect enablement; the
+  actual event handling is implemented in Phase 7.
+
+  Note: canRetrieveWindowContent is kept FALSE during Phase 1 to make the
+  Play Console permission declaration tractable. It can be enabled later if
+  the implementation truly needs window text scraping — which the current
+  design does not (we only need foreground package transitions).
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault|flagRetrieveInteractiveWindows"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/accessibility_service_description"
+    android:notificationTimeout="100"
+    android:summary="@string/accessibility_service_label" />
