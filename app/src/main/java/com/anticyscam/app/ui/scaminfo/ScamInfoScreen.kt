@@ -1,80 +1,397 @@
 package com.anticyscam.app.ui.scaminfo
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Mail
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.anticyscam.app.domain.model.ChannelIcon
+import com.anticyscam.app.domain.model.ChannelType
+import com.anticyscam.app.domain.model.EmergencyChannel
+import com.anticyscam.app.domain.model.ScamCategory
+import com.anticyscam.app.domain.model.ScamSeverity
+import com.anticyscam.app.domain.model.ScamTactic
 import com.anticyscam.app.ui.theme.AlertYellow
+import com.anticyscam.app.ui.theme.DividerGray
+import com.anticyscam.app.ui.theme.SurfaceBlack
 import com.anticyscam.app.ui.theme.SurfaceDim
+import com.anticyscam.app.ui.theme.SurfaceElevated
+import com.anticyscam.app.ui.theme.TextDisabled
 import com.anticyscam.app.ui.theme.TextPrimary
 import com.anticyscam.app.ui.theme.TextSecondary
 import com.anticyscam.app.ui.theme.WarningRed
+import com.anticyscam.app.ui.theme.WarningRedLight
 
 /**
- * 詐騙專區 — 列出常見台灣詐騙手法 + 反詐器的對應防護方式。
- * 內容為固定文案，由本地維護，不打網路（避免 PII / 廣告風險）。
+ * 反詐專區 — driven by [ScamInfoRepository] reading
+ * `assets/scam_catalog.json`. The JSON is the catalog "database" intended to
+ * be refreshed by a future GitHub Actions cron; runtime makes no network
+ * calls. Provides search, category filter, and direct dialers / links into
+ * 165 / CIB / 警示帳戶查詢.
  */
 @Composable
-fun ScamInfoScreen() {
-    val items = remember { ScamTip.DEFAULTS }
+fun ScamInfoScreen(
+    viewModel: ScamInfoViewModel = hiltViewModel()
+) {
+    val state by viewModel.state.collectAsState()
+    val context = LocalContext.current
+
+    if (state.loading) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = WarningRed)
+        }
+        return
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item { Header(state) }
+
+        if (state.errorMessage != null) {
+            item { ErrorBanner(state.errorMessage!!) }
+        }
+
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "詐騙專區",
-                    color = WarningRed,
-                    style = MaterialTheme.typography.headlineMedium
-                )
-                Text(
-                    text = "了解常見詐騙手法，遇到可疑情況請務必撥打 165 反詐騙專線。",
-                    color = TextSecondary,
-                    style = MaterialTheme.typography.bodyMedium
+            SectionTitle("緊急通報管道")
+        }
+        items(items = state.channels, key = { it.id }) { channel ->
+            ChannelCard(channel) { openChannel(context, channel) }
+        }
+
+        item { Spacer(Modifier.height(4.dp)) }
+        item {
+            SectionTitle("常見手法（${state.allTactics.size} 種）")
+        }
+        item {
+            SearchBar(
+                value = state.searchQuery,
+                onValueChange = viewModel::onSearchChanged
+            )
+        }
+        item {
+            CategoryChips(
+                categories = state.categories,
+                selected = state.selectedCategoryId,
+                onSelected = viewModel::onCategorySelected
+            )
+        }
+
+        val visible = state.visibleTactics
+        if (visible.isEmpty()) {
+            item { EmptyResult() }
+        } else {
+            items(items = visible, key = { it.id }) { tactic ->
+                TacticCard(
+                    tactic = tactic,
+                    expanded = tactic.id in state.expandedTacticIds,
+                    onToggle = { viewModel.onTacticExpanded(tactic.id) }
                 )
             }
         }
-        items(items = items, key = { it.title }) { tip ->
-            ScamTipCard(tip)
+
+        item { FooterDisclaimer(state.notice, state.source) }
+    }
+}
+
+@Composable
+private fun Header(state: ScamInfoState) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = "反詐專區",
+            color = WarningRed,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = "整合全台常見詐騙手法與通報管道。遇到可疑情況，請立即撥打 165。",
+            color = TextSecondary,
+            style = MaterialTheme.typography.bodyMedium
+        )
+        if (state.lastUpdated.isNotEmpty()) {
+            Text(
+                text = "資料版本 v${state.version}　更新日 ${state.lastUpdated}",
+                color = TextDisabled,
+                style = MaterialTheme.typography.bodySmall
+            )
         }
+    }
+}
+
+@Composable
+private fun ErrorBanner(message: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDim),
+        border = BorderStroke(1.dp, WarningRed)
+    ) {
+        Text(
+            text = message,
+            color = WarningRedLight,
+            modifier = Modifier.padding(16.dp),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text = text,
+        color = AlertYellow,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold
+    )
+}
+
+@Composable
+private fun ChannelCard(channel: EmergencyChannel, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceElevated),
+        border = BorderStroke(1.dp, DividerGray)
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ChannelIconBadge(channel.icon)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = channel.label,
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = channel.subtitle,
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    text = channel.value,
+                    color = WarningRedLight,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            Icon(
+                imageVector = if (channel.type == ChannelType.PHONE) Icons.Filled.Call else Icons.AutoMirrored.Filled.OpenInNew,
+                contentDescription = null,
+                tint = WarningRed
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChannelIconBadge(icon: ChannelIcon) {
+    val image = when (icon) {
+        ChannelIcon.PHONE -> Icons.Filled.Call
+        ChannelIcon.WEB -> Icons.Filled.Public
+        ChannelIcon.MAIL -> Icons.Filled.Mail
+        ChannelIcon.CHAT -> Icons.AutoMirrored.Filled.Chat
+        ChannelIcon.BANK -> Icons.Filled.AccountBalance
+    }
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .background(SurfaceDim, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(imageVector = image, contentDescription = null, tint = AlertYellow)
+    }
+}
+
+@Composable
+private fun SearchBar(value: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = { Text("搜尋手法、關鍵字（例如：LINE、紓困、ATM）", color = TextDisabled) },
+        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = TextSecondary) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = TextPrimary,
+            unfocusedTextColor = TextPrimary,
+            focusedBorderColor = WarningRed,
+            unfocusedBorderColor = DividerGray,
+            cursorColor = WarningRed,
+            focusedContainerColor = SurfaceDim,
+            unfocusedContainerColor = SurfaceDim
+        )
+    )
+}
+
+@Composable
+private fun CategoryChips(
+    categories: List<ScamCategory>,
+    selected: String?,
+    onSelected: (String?) -> Unit
+) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceDim),
-                border = BorderStroke(1.dp, AlertYellow)
+            FilterChip(
+                selected = selected == null,
+                onClick = { onSelected(null) },
+                label = { Text("全部") },
+                colors = chipColors()
+            )
+        }
+        items(items = categories, key = { it.id }) { category ->
+            FilterChip(
+                selected = selected == category.id,
+                onClick = { onSelected(if (selected == category.id) null else category.id) },
+                label = { Text(category.displayName) },
+                colors = chipColors()
+            )
+        }
+    }
+}
+
+@Composable
+private fun chipColors() = FilterChipDefaults.filterChipColors(
+    containerColor = SurfaceDim,
+    labelColor = TextSecondary,
+    selectedContainerColor = WarningRedLight,
+    selectedLabelColor = SurfaceBlack
+)
+
+@Composable
+private fun TacticCard(tactic: ScamTactic, expanded: Boolean, onToggle: () -> Unit) {
+    val borderColor = when (tactic.severity) {
+        ScamSeverity.CRITICAL -> WarningRed
+        ScamSeverity.HIGH -> AlertYellow
+        ScamSeverity.MEDIUM -> DividerGray
+    }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggle() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDim),
+        border = BorderStroke(1.dp, borderColor)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
+                Icon(
+                    imageVector = Icons.Filled.WarningAmber,
+                    contentDescription = null,
+                    tint = borderColor
+                )
+                Text(
+                    text = tactic.title,
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                SeverityPill(tactic.severity)
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    tint = TextSecondary
+                )
+            }
+            Text(
+                text = tactic.description,
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            if (tactic.tags.isNotEmpty()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    tactic.tags.take(4).forEach { tag ->
+                        Text(
+                            text = "#$tag",
+                            color = WarningRedLight,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+            AnimatedVisibility(visible = expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (tactic.redFlags.isNotEmpty()) {
+                        Text(
+                            text = "辨識特徵",
+                            color = AlertYellow,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        tactic.redFlags.forEach { flag ->
+                            Text(
+                                text = "・$flag",
+                                color = TextSecondary,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
                     Text(
-                        text = "緊急時請撥打 165",
+                        text = "保護方式",
                         color = AlertYellow,
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "165 反詐騙諮詢專線（24 小時服務）：可諮詢、報案、查詢可疑帳號。",
+                        text = tactic.protection,
                         color = TextPrimary,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -85,83 +402,60 @@ fun ScamInfoScreen() {
 }
 
 @Composable
-private fun ScamTipCard(tip: ScamTip) {
+private fun SeverityPill(severity: ScamSeverity) {
+    val (label, fg, bg) = when (severity) {
+        ScamSeverity.CRITICAL -> Triple("極高", Color.White, WarningRed)
+        ScamSeverity.HIGH -> Triple("高", SurfaceBlack, AlertYellow)
+        ScamSeverity.MEDIUM -> Triple("中", TextSecondary, SurfaceElevated)
+    }
+    Box(
+        modifier = Modifier
+            .background(bg, RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    ) {
+        Text(text = label, color = fg, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+@Composable
+private fun EmptyResult() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceDim),
-        border = BorderStroke(1.dp, WarningRed)
+        border = BorderStroke(1.dp, DividerGray)
     ) {
-        Column(
+        Text(
+            text = "目前查無符合條件的詐騙手法。",
+            color = TextSecondary,
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            androidx.compose.foundation.layout.Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.WarningAmber,
-                    contentDescription = null,
-                    tint = WarningRed
-                )
-                Text(
-                    text = tip.title,
-                    color = TextPrimary,
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
-            Text(
-                text = tip.description,
-                color = TextSecondary,
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Text(
-                text = "保護方式：${tip.protection}",
-                color = AlertYellow,
-                style = MaterialTheme.typography.bodyMedium
-            )
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun FooterDisclaimer(notice: String, source: String) {
+    Column(
+        modifier = Modifier.padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        if (notice.isNotEmpty()) {
+            Text(text = notice, color = TextDisabled, style = MaterialTheme.typography.bodySmall)
+        }
+        if (source.isNotEmpty()) {
+            Text(text = "資料來源：$source", color = TextDisabled, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
 
-private data class ScamTip(
-    val title: String,
-    val description: String,
-    val protection: String
-) {
-    companion object {
-        val DEFAULTS = listOf(
-            ScamTip(
-                title = "假冒檢警／公務員",
-                description = "歹徒冒充檢察官、警察或法院人員，告知您涉及洗錢、刑案，要求監管帳戶或匯款。",
-                protection = "真正的檢警「絕對不會」要求您匯款或提供存簿密碼。立即撥打 165 確認。"
-            ),
-            ScamTip(
-                title = "假網銀／釣魚連結",
-                description = "簡訊、Line 訊息或 Email 附帶網銀登入連結，網址近似但非真實網域，騙取帳密。",
-                protection = "切勿從訊息點擊連結。請使用反詐器內已綁定的網銀 App 開啟，避免進入假網站。"
-            ),
-            ScamTip(
-                title = "投資詐騙",
-                description = "標榜「保證獲利」、「內線消息」、「飆股群組」，要求加入私密群組或下載假投資 App。",
-                protection = "任何標榜保證獲利皆為詐騙。投資前請查證該機構是否為金管會合法業者。"
-            ),
-            ScamTip(
-                title = "ATM／網銀解除分期付款",
-                description = "歹徒謊稱您誤訂分期付款，要求至 ATM 或網銀「依語音指示」操作。",
-                protection = "ATM 與網銀絕無「解除分期」功能，任何指示操作 ATM 的電話皆為詐騙。"
-            ),
-            ScamTip(
-                title = "假交友／投資戀人",
-                description = "在交友 App 認識的對象迅速建立感情，誘導投資「他懂的飆股」或匯款救急。",
-                protection = "網路交友從未見面就談錢，幾乎必為詐騙。任何匯款要求請立即停止互動。"
-            ),
-            ScamTip(
-                title = "假購物退款",
-                description = "冒充電商客服稱訂單異常、需協助退款，要求提供信用卡或操作 ATM。",
-                protection = "電商真的退款只會退回原付款工具，絕不需要您操作 ATM 或提供卡片資訊。"
-            )
-        )
-    }
+private fun openChannel(context: android.content.Context, channel: EmergencyChannel) {
+    val intent = when (channel.type) {
+        ChannelType.PHONE -> Intent(Intent.ACTION_DIAL, Uri.parse("tel:${channel.value}"))
+        ChannelType.URL -> Intent(Intent.ACTION_VIEW, Uri.parse(channel.value))
+    }.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+    runCatching { context.startActivity(intent) }
+        .onFailure { e ->
+            if (e !is ActivityNotFoundException) throw e
+        }
 }
