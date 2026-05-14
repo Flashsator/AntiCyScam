@@ -24,10 +24,19 @@ object DatabaseModule {
             AntiScamDatabase::class.java,
             AntiScamDatabase.DB_NAME
         )
-            // Real migration path for v2 → v3 (edits_remaining column).
+            // Real migration paths.
+            // - v2 → v3: edits_remaining column.
+            // - v3 → v4: bind-maturation + cooldown-unbind columns.
             // fallbackToDestructiveMigration() stays as a last-resort net
             // for the v0.1.0 pre-release; remove once we ship a 1.x build.
-            .addMigrations(AntiScamDatabase.MIGRATION_2_3)
+            // NOTE: a destructive fallback would wipe MATURED state, which
+            // is the exact thing a scammer would want — keep proper
+            // migrations exhaustive and reconsider removing the fallback
+            // before shipping 1.x.
+            .addMigrations(
+                AntiScamDatabase.MIGRATION_2_3,
+                AntiScamDatabase.MIGRATION_3_4
+            )
             .fallbackToDestructiveMigration()
             .build()
 

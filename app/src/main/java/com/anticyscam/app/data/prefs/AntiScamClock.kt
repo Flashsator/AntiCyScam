@@ -2,6 +2,7 @@ package com.anticyscam.app.data.prefs
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.SystemClock
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -9,6 +10,22 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/**
+ * Atomic read of both wall-clock and monotonic time.
+ *
+ * Binding/unbinding cooldowns clamp progress to `min(wallDelta, elapsedDelta)`
+ * so a user who fast-forwards the system clock cannot accelerate the timer:
+ * wall jumps forward but elapsedNanos does not, so the smaller value wins.
+ *
+ * Both values come from a single read here so the deltas later are consistent
+ * with each other — taking them in separate calls would create a race window
+ * where the wall and monotonic clocks could drift between reads.
+ */
+data class NowSnapshot(
+    val wallMillis: Long,
+    val elapsedNanos: Long
+)
 
 /**
  * Time and app-open-count source of truth used by cooldown logic.
@@ -22,13 +39,28 @@ import javax.inject.Singleton
  * (just a monotonic counter).
  */
 @Singleton
-class AntiScamClock @Inject constructor(
+open class AntiScamClock @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    private val prefs: SharedPreferences =
+    // Lazy so test subclasses that only override [snapshot] do not need to
+    // wire up a real Context / SharedPreferences.
+    private val prefs: SharedPreferences by lazy {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
 
     fun now(): Long = System.currentTimeMillis()
+
+    /**
+     * Single read of wall + monotonic clocks. Use this when a cooldown
+     * decision depends on both — the pair must come from the same instant.
+     */
+    open fun snapshot(): NowSnapshot = NowSnapshot(
+        wallMillis = System.currentTimeMillis(),
+        elapsedNanos = SystemClock.elapsedRealtimeNanos()
+    )
+
+    /** Monotonic nanos — does not advance while device is in deep sleep. */
+    fun monotonicNanos(): Long = SystemClock.elapsedRealtimeNanos()
 
     fun appOpenCount(): Int = prefs.getInt(KEY_OPEN_COUNT, 0)
 

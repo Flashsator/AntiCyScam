@@ -20,11 +20,11 @@ import javax.inject.Singleton
  * Phase 1's manifest.
  */
 @Singleton
-class InstalledAppsProvider @Inject constructor(
+open class InstalledAppsProvider @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
 
-    suspend fun listLaunchableApps(): List<InstalledAppInfo> = withContext(Dispatchers.IO) {
+    open suspend fun listLaunchableApps(): List<InstalledAppInfo> = withContext(Dispatchers.IO) {
         val pm: PackageManager = context.packageManager
         val intent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)

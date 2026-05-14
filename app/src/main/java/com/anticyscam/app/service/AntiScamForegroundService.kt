@@ -14,7 +14,10 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.anticyscam.app.MainActivity
 import com.anticyscam.app.R
+import com.anticyscam.app.data.prefs.AntiScamClock
+import com.anticyscam.app.data.repository.BoundAppRepository
 import com.anticyscam.app.utils.AccessibilityChecker
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -23,6 +26,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * Sticky foreground service that keeps the app process alive on aggressive
@@ -35,7 +39,11 @@ import kotlinx.coroutines.launch
  *    boot, so the watchdog is online before the user opens any bank app.
  *  - START_STICKY so the OS attempts a restart if killed.
  */
+@AndroidEntryPoint
 class AntiScamForegroundService : Service() {
+
+    @Inject lateinit var boundAppRepository: BoundAppRepository
+    @Inject lateinit var clock: AntiScamClock
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var watchdogJob: Job? = null
@@ -51,6 +59,13 @@ class AntiScamForegroundService : Service() {
         startForegroundCompat()
         if (!enforceProtectionState()) return
         startWatchdog()
+        // Safety-net settle: BootReceiver also does this, but the service is
+        // also restarted by Android after process death without a reboot —
+        // catching that path is why we settle here too. Cheap when no rows.
+        scope.launch {
+            runCatching { boundAppRepository.settleAll(clock.snapshot()) }
+                .onFailure { Log.w(TAG, "onCreate settleAll failed", it) }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

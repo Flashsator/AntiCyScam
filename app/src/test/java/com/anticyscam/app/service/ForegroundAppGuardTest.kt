@@ -140,6 +140,8 @@ class ForegroundAppGuardTest {
         override suspend fun allPackageNames(): List<String> = emptyList()
         override suspend fun isBound(pkg: String): Boolean = false
         override suspend fun insertAll(apps: List<BoundAppEntity>) {}
+        override suspend fun update(row: BoundAppEntity) {}
+        override suspend fun updateAll(rows: List<BoundAppEntity>) {}
         override suspend fun deleteByPackage(pkg: String) {}
         override suspend fun deleteByPackages(pkgs: List<String>) {}
         override suspend fun clear() {}

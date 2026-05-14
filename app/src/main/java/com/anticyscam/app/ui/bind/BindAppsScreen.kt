@@ -25,21 +25,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.anticyscam.app.domain.model.BindingState
 import com.anticyscam.app.ui.components.AppIcon
 import com.anticyscam.app.ui.theme.AlertYellow
 import com.anticyscam.app.ui.theme.SurfaceBlack
@@ -52,25 +51,26 @@ import com.anticyscam.app.ui.theme.WarningRed
 /**
  * 綁定／解除 APP 頁面。
  *
- * Phase I: 不再列出寫死的銀行 App 清單（包名/品牌名差異太大，列了找不到反而誤導）。
- * 改成純文字提示，列出常見銀行 App 名稱讓使用者自己在清單中找。
+ * 批次儲存流程（使用者規格「勾完一堆按儲存+yes」）：
+ *  - 勾選 / 取消勾選 不會立刻寫入 DB
+ *  - 按下「儲存」時，ViewModel 分類所有想取消勾選的列：
+ *      - PendingMaturation（< 24h）→ 直接刪除，免冷靜期
+ *      - Matured（≥ 24h）        → 跳出 CooldownUnbindDialog 一次性確認
+ *  - 確認後一起寫入 + 關閉頁面
+ *
+ * PendingUnbind 列的特殊處理：
+ *  - checkbox 鎖住（一律 checked），代表這列仍受保護
+ *  - 點 checkbox 不會切換（VM toggle 早退）
+ *  - 列尾顯示「取消解除」inline 連結，按下就把這列倒數歸零、回到 Matured
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BindAppsScreen(onClose: () -> Unit) {
     val viewModel: BindAppsViewModel = hiltViewModel()
     val state by viewModel.state.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    LaunchedEffect(state.toastMessage) {
-        val msg = state.toastMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(msg)
-        viewModel.consumeToast()
-    }
 
     Scaffold(
         containerColor = SurfaceBlack,
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -121,13 +121,16 @@ fun BindAppsScreen(onClose: () -> Unit) {
                         items(items = state.apps, key = { "app:${it.packageName}" }) { app ->
                             BindableAppRow(
                                 app = app,
-                                onToggle = { viewModel.toggle(app.packageName) }
+                                onToggle = { viewModel.toggle(app.packageName) },
+                                onCancelCooldown = {
+                                    viewModel.onCancelCooldown(app.packageName)
+                                }
                             )
                         }
                     }
 
                     Button(
-                        onClick = { viewModel.save(onClose) },
+                        onClick = { viewModel.onSaveClicked(onClose) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 12.dp),
@@ -145,6 +148,16 @@ fun BindAppsScreen(onClose: () -> Unit) {
             }
         }
     }
+
+    if (state.showCooldownDialog) {
+        val labelByPkg = state.apps.associate { it.packageName to it.label }
+        val labels = state.pendingMaturedUnbinds.map { labelByPkg[it] ?: it }
+        CooldownUnbindDialog(
+            appLabels = labels,
+            onConfirm = { viewModel.onConfirmCooldownDialog(onClose) },
+            onDismiss = { viewModel.onDismissCooldownDialog() }
+        )
+    }
 }
 
 @Composable
@@ -158,12 +171,17 @@ private fun RecommendationHint() {
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
-            text = "常見銀行 App 提示",
+            text = "建議綁定的 App",
             color = AlertYellow,
             style = MaterialTheme.typography.titleSmall
         )
         Text(
-            text = "不同銀行 App 名稱差異很大（CUBE、Wallet、Richart、行動銀行…），請在下方清單找到您使用的網銀並勾選；Line、Messenger 等通訊 App 也建議納入保護。",
+            text = "・您使用的網銀（CUBE、Richart、行動銀行…）",
+            color = TextSecondary,
+            style = MaterialTheme.typography.bodySmall
+        )
+        Text(
+            text = "・支付工具",
             color = TextSecondary,
             style = MaterialTheme.typography.bodySmall
         )
@@ -171,17 +189,19 @@ private fun RecommendationHint() {
 }
 
 @Composable
-private fun BindableAppRow(app: BindableApp, onToggle: () -> Unit) {
-    val now = System.currentTimeMillis()
-    val unlockableAt = app.unlockableAt
-    val isLocked = app.isBound && unlockableAt != null && now < unlockableAt
+private fun BindableAppRow(
+    app: BindableApp,
+    onToggle: () -> Unit,
+    onCancelCooldown: () -> Unit
+) {
+    val isCoolingDown = app.state is BindingState.PendingUnbind
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
             .background(SurfaceDim)
-            .clickable(onClick = onToggle)
+            .let { if (isCoolingDown) it else it.clickable(onClick = onToggle) }
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -192,40 +212,67 @@ private fun BindableAppRow(app: BindableApp, onToggle: () -> Unit) {
             fallbackTint = TextDisabled
         )
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = app.label, color = TextPrimary, style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = app.label,
+                color = TextPrimary,
+                style = MaterialTheme.typography.titleSmall
+            )
             Text(
                 text = app.packageName,
                 color = TextDisabled,
                 style = MaterialTheme.typography.bodySmall
             )
-            if (isLocked && unlockableAt != null) {
-                val remainingMs = unlockableAt - now
+            StateFooter(state = app.state)
+        }
+        if (isCoolingDown) {
+            TextButton(onClick = onCancelCooldown) {
                 Text(
-                    text = "🔒 ${formatUnbindLock(remainingMs)} 後可解除",
+                    text = "取消解除",
                     color = AlertYellow,
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
                 )
             }
-        }
-        Checkbox(
-            checked = app.isBound,
-            onCheckedChange = { onToggle() },
-            colors = CheckboxDefaults.colors(
-                checkedColor = WarningRed,
-                uncheckedColor = TextSecondary,
-                checkmarkColor = TextPrimary,
-                disabledCheckedColor = AlertYellow
+        } else {
+            Checkbox(
+                checked = app.isBound,
+                onCheckedChange = { onToggle() },
+                colors = CheckboxDefaults.colors(
+                    checkedColor = WarningRed,
+                    uncheckedColor = TextSecondary,
+                    checkmarkColor = TextPrimary,
+                    disabledCheckedColor = AlertYellow
+                )
             )
-        )
+        }
     }
 }
 
-private fun formatUnbindLock(remainingMs: Long): String {
-    val hours = remainingMs / (60L * 60 * 1000)
-    val mins = (remainingMs / (60L * 1000)) % 60
-    return when {
-        hours > 0 -> "${hours}小時${mins}分"
-        mins > 0 -> "${mins}分"
-        else -> "1 分以內"
+@Composable
+private fun StateFooter(state: BindingState) {
+    when (state) {
+        is BindingState.PendingMaturation -> Text(
+            text = "綁定中 ${formatHms(state.remainingMs)}",
+            color = AlertYellow,
+            style = MaterialTheme.typography.bodySmall
+        )
+        BindingState.Matured -> Text(
+            text = "已綁定",
+            color = TextSecondary,
+            style = MaterialTheme.typography.bodySmall
+        )
+        is BindingState.PendingUnbind -> Text(
+            text = "解除中 剩 ${formatHms(state.remainingMs)}",
+            color = WarningRed,
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+        )
+        BindingState.Unbound -> Unit
     }
+}
+
+private fun formatHms(remainingMs: Long): String {
+    val total = (remainingMs / 1000L).coerceAtLeast(0L)
+    val h = total / 3600
+    val m = (total % 3600) / 60
+    val s = total % 60
+    return "%02d:%02d:%02d".format(h, m, s)
 }
