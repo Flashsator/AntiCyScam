@@ -5,7 +5,10 @@ import com.anticyscam.app.data.local.dao.TransferAccountDao
 import com.anticyscam.app.data.local.entity.TransferAccountEntity
 import com.anticyscam.app.data.prefs.AntiScamClock
 import com.anticyscam.app.data.prefs.DailyAddTracker
+import com.anticyscam.app.data.prefs.NowSnapshot
 import com.anticyscam.app.domain.model.TransferAccount
+import com.anticyscam.app.domain.model.TransferAccountState
+import com.anticyscam.app.domain.transfer.TransferAccountSettleEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -20,11 +23,14 @@ import javax.inject.Singleton
  * [TransferAccount] domain objects.
  *
  * Business rules enforced here (not in DAO):
- *  - At most [TransferAccount.MAX_ACCOUNTS] rows.
- *  - The default "臨時用" row is seeded once and cannot be deleted.
- *  - Every successful add (or number-change) is recorded against the
- *    [DailyAddTracker] and writes the 24h cooldown anchors so the row
- *    is treated as 臨時用-level during its freshness window.
+ *  - At most [TransferAccount.MAX_ACCOUNTS] rows including the default.
+ *  - The default 「臨時用」 row is seeded once and is exempt from every
+ *    cooldown and from the daily-add counter.
+ *  - Every successful add (or number-change edit) is recorded against
+ *    [DailyAddTracker] and writes maturation anchors so the row starts
+ *    counting toward the 24h 已綁定 gate.
+ *  - Edit is only allowed while a row is [TransferAccountState.PendingMaturation]
+ *    and `editsRemaining > 0`. Matured / PendingDeletion rows refuse edits.
  */
 @Singleton
 class TransferAccountRepository @Inject constructor(
@@ -42,9 +48,23 @@ class TransferAccountRepository @Inject constructor(
     suspend fun findById(id: Long): TransferAccount? =
         dao.findById(id)?.let(::toDomain)
 
-    suspend fun add(name: String, accountNumber: String): AddResult {
+    /**
+     * Derive the runtime state of a row at this instant — used by the UI
+     * layer (cards, dialogs) without going through a full Flow recompose.
+     */
+    suspend fun stateOf(id: Long): TransferAccountState? {
+        val row = dao.findById(id) ?: return null
+        return TransferAccountSettleEngine.deriveState(row, clock.snapshot())
+    }
+
+    suspend fun add(
+        name: String,
+        accountNumber: String,
+        bankCode: String? = null
+    ): AddResult {
         val trimmedName = name.trim()
         val trimmedAccount = accountNumber.trim()
+        val trimmedBankCode = bankCode?.trim()?.ifEmpty { null }
         if (trimmedName.isEmpty() || trimmedAccount.isEmpty()) {
             return AddResult.InvalidInput
         }
@@ -52,26 +72,29 @@ class TransferAccountRepository @Inject constructor(
             return AddResult.LimitReached
         }
         // Reserve a slot in the daily counter BEFORE writing to the DB so
-        // that a crash between the two would leave the user with a smaller
+        // that a crash between the two leaves the user with a smaller
         // count, not a phantom entry.
         return when (val outcome = dailyAddTracker.recordAddAttempt()) {
             is DailyAddTracker.Outcome.AlreadyLocked ->
                 AddResult.DailyLocked(outcome.remainingMs)
-            is DailyAddTracker.Outcome.HitLimit -> {
-                // This attempt triggered the limit — DO NOT actually insert.
-                AddResult.DailyLimitTriggered(outcome.lockUntil)
-            }
+            is DailyAddTracker.Outcome.HitLimit ->
+                AddResult.DailyLimitTriggered(outcome.remainingMs)
             is DailyAddTracker.Outcome.Allowed -> {
-                val now = clock.now()
+                val snap = clock.snapshot()
                 val entity = TransferAccountEntity(
                     name = trimmedName,
                     accountCipher = cipher.encrypt(trimmedAccount),
+                    bankCode = trimmedBankCode,
                     isDefault = false,
-                    createdAt = now,
-                    cooldownEndsAt = now + TransferAccount.COOLDOWN_DURATION_MS,
-                    cooldownOpenCountTarget = 0,
-                    lastUsedAt = 0L,
-                    dormantConsumed = false
+                    createdAt = snap.wallMillis,
+                    boundAnchorWall = snap.wallMillis,
+                    boundAnchorElapsedNanos = snap.elapsedNanos,
+                    accumulatedBoundMillis = 0L,
+                    deleteRequestedAtWall = null,
+                    deleteRequestedAtElapsedNanos = null,
+                    accumulatedDeleteMillis = 0L,
+                    lastSettledWall = snap.wallMillis,
+                    lastSettledElapsedNanos = snap.elapsedNanos
                 )
                 val newId = dao.insert(entity)
                 AddResult.Success(
@@ -84,57 +107,66 @@ class TransferAccountRepository @Inject constructor(
     }
 
     /**
-     * Edit an existing row's name and/or account number. Consumes exactly
-     * one slot from `edits_remaining` if anything actually changes — the
-     * PRD models "新增完後編輯一次" as one slot total, not one per field,
-     * so a name-only tweak still burns the slot.
+     * Edit an existing row. Allowed only while the row is in
+     * [TransferAccountState.PendingMaturation] (< 24h) AND
+     * `editsRemaining > 0`. A Matured / PendingDeletion / Default row
+     * cannot be edited — that closes the 「等到使用者 24h 後再竄改」 attack.
      *
-     * If the *account number* changes, the row is treated like a brand-new
-     * add: cooldown anchors reset AND the daily counter ticks. A name-only
-     * change is free of those rules but still consumes the slot.
+     * If the account number changes, the row is reset to a fresh
+     * PendingMaturation with new anchors AND the daily counter ticks. A
+     * name-only edit is free of daily/cooldown rules but still consumes
+     * the slot.
      */
     suspend fun editAccount(
         id: Long,
         newName: String,
-        newAccountNumber: String
+        newAccountNumber: String,
+        newBankCode: String? = null
     ): AddResult {
         val existing = dao.findById(id) ?: return AddResult.InvalidInput
         if (existing.isDefault) return AddResult.InvalidInput
         if (existing.editsRemaining <= 0) return AddResult.EditsExhausted
 
+        val state = TransferAccountSettleEngine.deriveState(existing, clock.snapshot())
+        if (state !is TransferAccountState.PendingMaturation) {
+            return AddResult.EditWindowClosed
+        }
+
         val trimmedName = newName.trim()
         val trimmedNumber = newAccountNumber.trim()
+        val trimmedBankCode = newBankCode?.trim()?.ifEmpty { null }
         if (trimmedName.isEmpty() || trimmedNumber.isEmpty()) {
             return AddResult.InvalidInput
         }
 
+        // Spec #3: any 確認 burns the one-shot slot — even a true no-op
+        // confirm permanently retires the edit button. We only branch on
+        // whether the number changed (because that resets the 24h
+        // maturation timer + ticks the daily counter); name / bank-code
+        // diffs and pure no-ops both fall through to the slot-burn path.
         val existingNumber = runCatching { cipher.decrypt(existing.accountCipher) }
             .getOrDefault("")
         val numberChanged = trimmedNumber != existingNumber
-        val nameChanged = trimmedName != existing.name
-
-        if (!numberChanged && !nameChanged) {
-            // No-op save — don't waste the slot.
-            return AddResult.Success(id = id, countToday = 0, warning = false)
-        }
 
         if (numberChanged) {
             return when (val outcome = dailyAddTracker.recordAddAttempt()) {
                 is DailyAddTracker.Outcome.AlreadyLocked ->
                     AddResult.DailyLocked(outcome.remainingMs)
                 is DailyAddTracker.Outcome.HitLimit ->
-                    AddResult.DailyLimitTriggered(outcome.lockUntil)
+                    AddResult.DailyLimitTriggered(outcome.remainingMs)
                 is DailyAddTracker.Outcome.Allowed -> {
-                    val now = clock.now()
+                    val snap = clock.snapshot()
                     val rows = dao.replaceAccountCipher(
                         id = id,
                         cipher = cipher.encrypt(trimmedNumber),
-                        createdAt = now,
-                        cooldownEndsAt = now + TransferAccount.COOLDOWN_DURATION_MS,
-                        openTarget = 0
+                        bankCode = trimmedBankCode,
+                        nowWall = snap.wallMillis,
+                        nowElapsedNanos = snap.elapsedNanos
                     )
                     if (rows == 0) return AddResult.EditsExhausted
-                    if (nameChanged) dao.rename(id, trimmedName)
+                    // replaceAccountCipher only touches the cipher + anchors;
+                    // sync the label + bank code with a follow-up UPDATE.
+                    dao.updateNameAndBankCode(id, trimmedName, trimmedBankCode)
                     AddResult.Success(
                         id = id,
                         countToday = outcome.countToday,
@@ -144,29 +176,76 @@ class TransferAccountRepository @Inject constructor(
             }
         }
 
-        // Name-only path: free of daily/cooldown rules, but still burns the slot.
-        dao.rename(id, trimmedName)
+        // Number unchanged → no daily-counter tick, no maturation reset.
+        // We still rewrite name + bank code (cheap idempotent UPDATE) and
+        // ALWAYS decrement editsRemaining so the edit icon disappears.
+        dao.updateNameAndBankCode(id, trimmedName, trimmedBankCode)
         val rows = dao.decrementEditsRemaining(id)
         if (rows == 0) return AddResult.EditsExhausted
         return AddResult.Success(id = id, countToday = 0, warning = false)
     }
 
-    /** Stamp a successful use — drives the 90-day dormancy clock. */
-    suspend fun markUsed(id: Long) {
-        dao.touchUsage(id, clock.now())
+    /**
+     * Request deletion of a row.
+     *
+     * Branching by current state (per user spec):
+     *  - PendingMaturation (< 24h, 「臨時用」 phase) → hard-delete immediately.
+     *    These rows haven't earned the 「已綁定」 trust gate yet, so there's
+     *    no anti-tamper benefit in forcing a cooldown.
+     *  - Matured (≥ 24h) → start the 48h cooldown so a hijacker who got
+     *    past the lock screen still can't quietly burn a bound recipient.
+     *  - PendingDeletion → no-op (already cooling down). Idempotent.
+     *  - Default 「臨時用」 → no-op (DAO guards this anyway).
+     */
+    suspend fun requestDelete(id: Long): Boolean {
+        val row = dao.findById(id) ?: return false
+        if (row.isDefault) return false
+        val state = TransferAccountSettleEngine.deriveState(row, clock.snapshot())
+        return when (state) {
+            is TransferAccountState.PendingMaturation ->
+                dao.deleteIfNotDefault(id) > 0
+            TransferAccountState.Matured -> {
+                val snap = clock.snapshot()
+                dao.requestDelete(
+                    id = id,
+                    nowWall = snap.wallMillis,
+                    nowElapsedNanos = snap.elapsedNanos
+                ) > 0
+            }
+            is TransferAccountState.PendingDeletion,
+            TransferAccountState.Default -> false
+        }
     }
 
-    /** Called after a dormant account survives its one-time verification. */
-    suspend fun consumeDormantVerification(id: Long) {
-        dao.markDormantConsumed(id)
-        dao.touchUsage(id, clock.now())
+    /** Cancel a pending-delete and return the row to its prior state. */
+    suspend fun cancelDelete(id: Long): Boolean = dao.cancelDelete(id) > 0
+
+    /**
+     * Settle every non-default row against the current clock; hard-delete
+     * any row whose 48h delete cooldown has expired. Persists settled
+     * anchors so subsequent UI ticks don't replay the same advance.
+     *
+     * Called from the ViewModel's per-second ticker — cheap because the
+     * settle engine is pure-functional + writes only on actual change.
+     */
+    suspend fun sweepAutoDeletes() {
+        val snap = clock.snapshot()
+        val rows = dao.allNonDefault()
+        for (row in rows) {
+            if (TransferAccountSettleEngine.isAutoDeleteDue(row, snap)) {
+                dao.deleteIfNotDefault(row.id)
+                continue
+            }
+            val settled = TransferAccountSettleEngine.settle(row, snap)
+            if (settled != row) dao.update(settled)
+        }
     }
 
     /**
-     * Seed the built-in "臨時用" default account exactly once.
-     * Safe to call on every app start — does nothing if already present.
-     * The default account stores an empty string as its number (no copy
-     * happens when the user selects it; it just bypasses the friction).
+     * Seed the built-in 「臨時用」 default account exactly once. Safe to
+     * call on every app start — does nothing if already present. The
+     * default account stores an empty string as its number (no copy
+     * happens when the user selects it; it just bypasses friction).
      */
     suspend fun ensureDefaultSeeded(defaultLabel: String) {
         if (dao.defaultCount() > 0) return
@@ -174,20 +253,29 @@ class TransferAccountRepository @Inject constructor(
             TransferAccountEntity(
                 name = defaultLabel,
                 accountCipher = cipher.encrypt(""),
+                bankCode = null,
                 isDefault = true,
                 createdAt = 0L, // sort before any user-created entry
-                cooldownEndsAt = 0L,
-                cooldownOpenCountTarget = 0,
-                lastUsedAt = 0L,
-                dormantConsumed = false
+                boundAnchorWall = 0L,
+                boundAnchorElapsedNanos = 0L,
+                accumulatedBoundMillis = 0L,
+                deleteRequestedAtWall = null,
+                deleteRequestedAtElapsedNanos = null,
+                accumulatedDeleteMillis = 0L,
+                lastSettledWall = 0L,
+                lastSettledElapsedNanos = 0L
             )
         )
     }
 
-    suspend fun delete(id: Long): Boolean = dao.deleteIfNotDefault(id) > 0
+    /**
+     * Hard-delete bypass — only used by debug/cleanup paths. The normal
+     * deletion flow MUST go through [requestDelete] + [sweepAutoDeletes].
+     */
+    suspend fun forceDelete(id: Long): Boolean = dao.deleteIfNotDefault(id) > 0
 
     /**
-     * Wipe user-created accounts only. The default 「臨時用」row is kept
+     * Wipe user-created accounts only. The default 「臨時用」 row is kept
      * forever — clearing app data must never remove it, otherwise the
      * picker sheet loses its always-available fallback.
      */
@@ -201,12 +289,27 @@ class TransferAccountRepository @Inject constructor(
                 .getOrDefault(""),
             isDefault = entity.isDefault,
             createdAt = entity.createdAt,
-            cooldownEndsAt = entity.cooldownEndsAt,
-            cooldownOpenCountTarget = entity.cooldownOpenCountTarget,
-            lastUsedAt = entity.lastUsedAt,
-            dormantConsumed = entity.dormantConsumed,
-            editsRemaining = entity.editsRemaining
+            boundAnchorWall = entity.boundAnchorWall,
+            boundAnchorElapsedNanos = entity.boundAnchorElapsedNanos,
+            accumulatedBoundMillis = entity.accumulatedBoundMillis,
+            deleteRequestedAtWall = entity.deleteRequestedAtWall,
+            deleteRequestedAtElapsedNanos = entity.deleteRequestedAtElapsedNanos,
+            accumulatedDeleteMillis = entity.accumulatedDeleteMillis,
+            lastSettledWall = entity.lastSettledWall,
+            lastSettledElapsedNanos = entity.lastSettledElapsedNanos,
+            editsRemaining = entity.editsRemaining,
+            bankCode = entity.bankCode
         )
+
+    /**
+     * Returns the engine state of a domain row at a given clock snapshot —
+     * convenient for view models that already have a [TransferAccount] in
+     * hand. Calls the entity-free overload so the per-second tick on the
+     * main screen does not allocate a throw-away entity per visible card
+     * (see memory: scroll-perf-rule).
+     */
+    fun stateOf(account: TransferAccount, now: NowSnapshot): TransferAccountState =
+        TransferAccountSettleEngine.deriveState(account, now)
 
     sealed interface AddResult {
         data class Success(
@@ -217,10 +320,12 @@ class TransferAccountRepository @Inject constructor(
         data object LimitReached : AddResult
         data object InvalidInput : AddResult
         /** This attempt is the one that triggered the daily lockdown. */
-        data class DailyLimitTriggered(val lockUntil: Long) : AddResult
+        data class DailyLimitTriggered(val remainingMs: Long) : AddResult
         /** Lockdown already in effect from an earlier attempt. */
         data class DailyLocked(val remainingMs: Long) : AddResult
         /** The one-shot edit slot for this row is already spent. */
         data object EditsExhausted : AddResult
+        /** Row is past the 24h 編輯窗 (Matured / PendingDeletion). */
+        data object EditWindowClosed : AddResult
     }
 }

@@ -3,15 +3,14 @@ package com.anticyscam.app.domain.model
 /**
  * Domain representation of a transfer account.
  *
- * `accountNumber` is plain text at this layer — encryption is an implementation
- * detail of the data layer.
+ * `accountNumber` is plain text at this layer — encryption is an
+ * implementation detail of the data layer.
  *
- * Plan v4 simplifies the cooldown rule to pure 24h wall-clock — a freshly
- * added account stays in 冷卻 (cooldown) until [cooldownEndsAt]. The previous
- * "+3 app opens" anti-tamper gate has been removed. `cooldownOpenCountTarget`
- * is retained on the entity for schema stability but ignored by [status].
- *
- * `lastUsedAt` powers the 90-day dormancy rule.
+ * Plan v5 replaces the previous 「cooldownEndsAt 純牆鐘」 model with the same
+ * dual-anchor (wall + monotonic) settlement used by bound apps — see
+ * [com.anticyscam.app.domain.transfer.TransferAccountSettleEngine] for the
+ * full clock-tamper-resistance rules. The 90-day Dormant branch was removed
+ * per user spec (「90 天未用拿掉好了，讓使用者自己決定刪除」).
  */
 data class TransferAccount(
     val id: Long,
@@ -19,46 +18,49 @@ data class TransferAccount(
     val accountNumber: String,
     val isDefault: Boolean,
     val createdAt: Long,
-    val cooldownEndsAt: Long,
-    val cooldownOpenCountTarget: Int,
-    val lastUsedAt: Long,
-    val dormantConsumed: Boolean,
-    val editsRemaining: Int
-) {
+
+    /** Wall-clock anchor when the maturation timer began (= createdAt at insert). */
+    val boundAnchorWall: Long,
+    /** Monotonic anchor paired with [boundAnchorWall]. */
+    val boundAnchorElapsedNanos: Long,
+    /** Settled millis toward the 24h maturation gate. */
+    val accumulatedBoundMillis: Long,
+
+    /** NULL until the user requests delete; non-NULL = cooldown is running. */
+    val deleteRequestedAtWall: Long?,
+    /** Monotonic anchor at delete-request time. */
+    val deleteRequestedAtElapsedNanos: Long?,
+    /** Settled millis toward the 48h auto-delete threshold. */
+    val accumulatedDeleteMillis: Long,
+
+    /** Last wall-time the settle engine wrote to this row. */
+    val lastSettledWall: Long,
+    /** Last monotonic-time the settle engine wrote to this row. */
+    val lastSettledElapsedNanos: Long,
+
+    val editsRemaining: Int,
+
     /**
-     * Compute the runtime status from current clocks. Pure function — no
-     * side effects. Plan v4: cooldown is now pure 24h wall-clock; the
-     * `openCount` parameter is kept for callsite stability but unused.
+     * Optional bank code (e.g. 台幣三碼 "812"). Null/blank when the user did
+     * not supply one. UI surfaces it as a "銀行代碼：XXX" line on the card
+     * when present, and the AddTransferAccountDialog exposes it as the
+     * 「銀行代碼(選填)」 field.
      */
-    @Suppress("UNUSED_PARAMETER")
-    fun status(now: Long, openCount: Int): Status {
-        if (isDefault) return Status.Default
-        if (now < cooldownEndsAt) {
-            val remaining = (cooldownEndsAt - now).coerceAtLeast(0L)
-            return Status.InCooldown(remainingMs = remaining)
-        }
-        val lastUsed = lastUsedAt
-        if (lastUsed > 0L && now - lastUsed >= DORMANT_AFTER_MS && !dormantConsumed) {
-            return Status.Dormant
-        }
-        return Status.Normal
-    }
-
-    sealed interface Status {
-        data object Default : Status
-        data object Normal : Status
-        data class InCooldown(val remainingMs: Long) : Status
-        data object Dormant : Status
-    }
-
+    val bankCode: String? = null
+) {
     companion object {
-        const val MAX_ACCOUNTS = 5
-        const val COOLDOWN_DURATION_MS: Long = 24L * 60 * 60 * 1000
-        const val DORMANT_AFTER_MS: Long = 90L * 24 * 60 * 60 * 1000
-        // Plan v4: a freshly added account may be edited exactly once. After
-        // the edit consumes this slot the only remaining action is deletion,
-        // making "wait, transfer to *this* number instead" spoofing via
-        // repeated edits impossible.
+        /**
+         * Hard ceiling on the total row count. Includes the永久 default
+         * 「臨時用」 row, so users may add at most 5 of their own.
+         */
+        const val MAX_ACCOUNTS = 6
+
+        /**
+         * A freshly added account may be edited exactly once. After the edit
+         * consumes this slot the only remaining action is request-delete,
+         * making 「等使用者編輯時把帳號換成詐騙帳號」 attacks impossible past
+         * the first commit.
+         */
         const val INITIAL_EDITS_REMAINING: Int = 1
     }
 }

@@ -18,6 +18,9 @@ interface TransferAccountDao {
     @Query("SELECT * FROM transfer_accounts WHERE id = :id LIMIT 1")
     suspend fun findById(id: Long): TransferAccountEntity?
 
+    @Query("SELECT * FROM transfer_accounts WHERE is_default = 0")
+    suspend fun allNonDefault(): List<TransferAccountEntity>
+
     @Query("SELECT COUNT(*) FROM transfer_accounts")
     suspend fun count(): Int
 
@@ -36,49 +39,53 @@ interface TransferAccountDao {
     @Query("DELETE FROM transfer_accounts WHERE id = :id AND is_default = 0")
     suspend fun deleteIfNotDefault(id: Long): Int
 
-    @Query(
-        "UPDATE transfer_accounts SET last_used_at = :ts, dormant_consumed = 0 " +
-            "WHERE id = :id AND is_default = 0"
-    )
-    suspend fun touchUsage(id: Long, ts: Long)
-
-    @Query(
-        "UPDATE transfer_accounts SET dormant_consumed = 1 WHERE id = :id AND is_default = 0"
-    )
-    suspend fun markDormantConsumed(id: Long)
-
     /**
      * Atomically replace the encrypted account number AND decrement the
-     * one-shot edit slot. The `edits_remaining > 0` guard means a caller
-     * who races past the repository gate cannot drain the slot below 0.
-     * Returns rows affected — 0 means the edit slot was already exhausted.
+     * one-shot edit slot AND reset all maturation anchors. The
+     * `edits_remaining > 0` guard means a caller who races past the
+     * repository gate cannot drain the slot below 0. Returns rows
+     * affected — 0 means the edit slot was already exhausted.
      */
     @Query(
         "UPDATE transfer_accounts SET " +
             "account_cipher = :cipher, " +
-            "created_at = :createdAt, " +
-            "cooldown_ends_at = :cooldownEndsAt, " +
-            "cooldown_open_target = :openTarget, " +
-            "edits_remaining = edits_remaining - 1, " +
-            "dormant_consumed = 0 " +
+            "bank_code = :bankCode, " +
+            "created_at = :nowWall, " +
+            "bound_anchor_wall = :nowWall, " +
+            "bound_anchor_elapsed_nanos = :nowElapsedNanos, " +
+            "accumulated_bound_millis = 0, " +
+            "delete_requested_at_wall = NULL, " +
+            "delete_requested_at_elapsed_nanos = NULL, " +
+            "accumulated_delete_millis = 0, " +
+            "last_settled_wall = :nowWall, " +
+            "last_settled_elapsed_nanos = :nowElapsedNanos, " +
+            "edits_remaining = edits_remaining - 1 " +
             "WHERE id = :id AND is_default = 0 AND edits_remaining > 0"
     )
     suspend fun replaceAccountCipher(
         id: Long,
         cipher: String,
-        createdAt: Long,
-        cooldownEndsAt: Long,
-        openTarget: Int
+        bankCode: String?,
+        nowWall: Long,
+        nowElapsedNanos: Long
     ): Int
 
-    @Query("UPDATE transfer_accounts SET name = :name WHERE id = :id AND is_default = 0")
-    suspend fun rename(id: Long, name: String)
+    /**
+     * Name + bank-code edit that leaves the encrypted account number and the
+     * maturation anchors untouched. Used by the editAccount path when only
+     * the label or bank code changed (or nothing changed at all — the slot
+     * is still burned via [decrementEditsRemaining]).
+     */
+    @Query(
+        "UPDATE transfer_accounts SET name = :name, bank_code = :bankCode " +
+            "WHERE id = :id AND is_default = 0"
+    )
+    suspend fun updateNameAndBankCode(id: Long, name: String, bankCode: String?)
 
     /**
-     * Decrement edits_remaining without touching the encrypted number.
-     * Used when an edit changes only the name (label) — the edit slot is
-     * still consumed because the PRD models "編輯一次" as one slot total,
-     * not one per field.
+     * Decrement edits_remaining without touching the encrypted number. Used
+     * when an edit changes only the name (label) — the edit slot is still
+     * consumed because "編輯一次" is one slot total, not one per field.
      */
     @Query(
         "UPDATE transfer_accounts SET edits_remaining = edits_remaining - 1 " +
@@ -87,10 +94,45 @@ interface TransferAccountDao {
     suspend fun decrementEditsRemaining(id: Long): Int
 
     /**
-     * Wipe only user-created accounts. The built-in 「臨時用」default row
+     * Mark a row as PendingDeletion. The 48h cooldown anchors start running
+     * from the supplied snapshot. The bound-maturation columns are left
+     * intact so a cancel can return the row to its prior state untouched.
+     * Guarded against the default row.
+     */
+    @Query(
+        "UPDATE transfer_accounts SET " +
+            "delete_requested_at_wall = :nowWall, " +
+            "delete_requested_at_elapsed_nanos = :nowElapsedNanos, " +
+            "accumulated_delete_millis = 0, " +
+            "last_settled_wall = :nowWall, " +
+            "last_settled_elapsed_nanos = :nowElapsedNanos " +
+            "WHERE id = :id AND is_default = 0 AND delete_requested_at_wall IS NULL"
+    )
+    suspend fun requestDelete(
+        id: Long,
+        nowWall: Long,
+        nowElapsedNanos: Long
+    ): Int
+
+    /**
+     * Cancel a pending-delete and return the row to whatever
+     * maturation state it was in. The maturation anchors are NOT touched —
+     * settlement during the cooldown was applied to delete-millis, not
+     * bound-millis, so the bound side is correct as-is.
+     */
+    @Query(
+        "UPDATE transfer_accounts SET " +
+            "delete_requested_at_wall = NULL, " +
+            "delete_requested_at_elapsed_nanos = NULL, " +
+            "accumulated_delete_millis = 0 " +
+            "WHERE id = :id AND is_default = 0 AND delete_requested_at_wall IS NOT NULL"
+    )
+    suspend fun cancelDelete(id: Long): Int
+
+    /**
+     * Wipe only user-created accounts. The built-in 「臨時用」 default row
      * (is_default = 1) is preserved across "clear all data" by design —
-     * it is part of the app's fixture, not user data, and the gate flow
-     * depends on its always-present id.
+     * it is part of the app's fixture, not user data.
      */
     @Query("DELETE FROM transfer_accounts WHERE is_default = 0")
     suspend fun clearUserCreated()

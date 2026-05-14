@@ -27,6 +27,8 @@ object DatabaseModule {
             // Real migration paths.
             // - v2 → v3: edits_remaining column.
             // - v3 → v4: bind-maturation + cooldown-unbind columns.
+            // - v4 → v5: transfer-account dual-anchor maturation + delete
+            //   cooldown; drops the legacy cooldown_ends_at branch.
             // fallbackToDestructiveMigration() stays as a last-resort net
             // for the v0.1.0 pre-release; remove once we ship a 1.x build.
             // NOTE: a destructive fallback would wipe MATURED state, which
@@ -35,7 +37,9 @@ object DatabaseModule {
             // before shipping 1.x.
             .addMigrations(
                 AntiScamDatabase.MIGRATION_2_3,
-                AntiScamDatabase.MIGRATION_3_4
+                AntiScamDatabase.MIGRATION_3_4,
+                AntiScamDatabase.MIGRATION_4_5,
+                AntiScamDatabase.MIGRATION_5_6
             )
             .fallbackToDestructiveMigration()
             .build()
