@@ -21,3 +21,8 @@ val DividerGray = Color(0xFF3A3A3A)
 
 // Success / neutral states (used sparingly — main theme is warning-first)
 val SuccessGreen = Color(0xFF43A047)
+
+// Highlight for user-created data (transfer-account names entered by the
+// user). Sits outside the warning palette on purpose so user rows read as
+// "yours" against the AlertYellow default + SuccessGreen matured states.
+val UserAccentBlue = Color(0xFF4FC3F7)

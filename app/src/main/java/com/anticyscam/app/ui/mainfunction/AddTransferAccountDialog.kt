@@ -36,14 +36,17 @@ import com.anticyscam.app.ui.theme.WarningRed
 @Composable
 fun AddTransferAccountDialog(
     onDismiss: () -> Unit,
-    onConfirm: (name: String, accountNumber: String) -> Unit,
+    onConfirm: (name: String, accountNumber: String, bankCode: String?) -> Unit,
     showSecondAddWarning: Boolean = false,
     isEditMode: Boolean = false,
     initialName: String = "",
-    initialAccountNumber: String = ""
+    initialAccountNumber: String = "",
+    initialBankCode: String = ""
 ) {
     var name by remember(initialName) { mutableStateOf(initialName) }
     var accountNumber by remember(initialAccountNumber) { mutableStateOf(initialAccountNumber) }
+    var bankCode by remember(initialBankCode) { mutableStateOf(initialBankCode) }
+    // 銀行代碼 is optional — only name + account number gate the Save button.
     val canSave = name.isNotBlank() && accountNumber.isNotBlank()
     val titleRes = if (isEditMode) R.string.transfer_edit_title else R.string.transfer_add_title
 
@@ -82,11 +85,21 @@ fun AddTransferAccountDialog(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
+                OutlinedTextField(
+                    value = bankCode,
+                    onValueChange = { bankCode = it.filter { ch -> ch.isDigit() } },
+                    label = { Text(stringResource(R.string.transfer_field_bank_code)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(name.trim(), accountNumber.trim()) },
+                onClick = {
+                    val trimmedBank = bankCode.trim().ifEmpty { null }
+                    onConfirm(name.trim(), accountNumber.trim(), trimmedBank)
+                },
                 enabled = canSave
             ) {
                 Text(

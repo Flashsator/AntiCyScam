@@ -49,7 +49,7 @@ fun BoundAppsRow(
         Box(
             modifier = modifier
                 .fillMaxWidth()
-                .height(72.dp),
+                .height(56.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -74,7 +74,7 @@ fun BoundAppsRow(
 @Composable
 private fun BoundAppTile(entry: BoundAppWithState, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.size(width = 96.dp, height = 128.dp),
+        modifier = Modifier.size(width = 84.dp, height = 104.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceDim),
         border = BorderStroke(width = 1.dp, color = WarningRed),
@@ -83,13 +83,13 @@ private fun BoundAppTile(entry: BoundAppWithState, onClick: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
+                .padding(6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             AppIcon(
                 packageName = entry.app.packageName,
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(28.dp),
                 fallbackTint = WarningRed
             )
             Text(

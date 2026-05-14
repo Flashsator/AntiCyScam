@@ -25,9 +25,17 @@
     <string name="transfer_edit_title">編輯轉帳帳號</string>
     <string name="transfer_edit_warning">每筆帳號只能編輯 1 次。儲存後本筆帳號將只剩刪除選項。\n若您是因為他人指示而修改，請立即停手並撥打 165。</string>
     <string name="transfer_edits_exhausted_toast">本筆帳號的編輯次數已用完，僅能刪除</string>
-    <string name="transfer_max_reached">最多只能新增 5 筆轉帳帳號</string>
+    <string name="transfer_edit_window_closed_toast">本筆帳號已超過 24 小時編輯期，現在只能刪除</string>
+    <string name="transfer_max_reached">最多只能新增 5 筆轉帳帳號（含臨時用共 6 筆）</string>
+    <string name="transfer_request_delete">刪除</string>
+    <string name="transfer_cancel_delete">取消刪除</string>
+    <string name="transfer_state_pending_maturation">綁定中</string>
+    <string name="transfer_state_matured">已綁定</string>
+    <string name="transfer_state_pending_deletion">解除中</string>
     <string name="transfer_field_name">姓名／用途</string>
     <string name="transfer_field_account">轉帳帳號</string>
+    <string name="transfer_field_bank_code">銀行代碼(選填)</string>
+    <string name="transfer_card_bank_code_prefix">銀行代碼</string>
     <string name="transfer_action_save">儲存</string>
     <string name="transfer_action_cancel">取消</string>
     <string name="transfer_copied">已複製帳號至剪貼簿</string>
@@ -102,7 +110,7 @@
     <string name="daily_add_lock_body">您今日已新增 3 筆轉帳帳號，這是常見的詐騙誘導模式。\n為了您的資產安全，新增功能已封鎖 24 小時。</string>
     <string name="daily_add_lock_call">立即撥打 165 防詐諮詢</string>
     <string name="daily_add_lock_return">返回防詐器</string>
-    <string name="daily_add_lock_warn_2">提醒：您今日已新增 2 筆帳號。再新增 1 筆將觸發 24 小時封鎖。</string>
+    <string name="daily_add_lock_warn_2">提醒：您今日已達 3 筆新增上限，再新增 1 筆將觸發 24 小時封鎖。</string>
     <string name="daily_add_locked_remaining">新增功能仍在封鎖中，剩餘 %1$s</string>
 
     <!-- Account status badges (cards) -->

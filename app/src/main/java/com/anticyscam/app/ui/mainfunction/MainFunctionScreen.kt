@@ -50,7 +50,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.anticyscam.app.R
 import com.anticyscam.app.domain.model.BoundApp
 import com.anticyscam.app.domain.model.TransferAccount
-import com.anticyscam.app.ui.dormant.DormantVerifyActivity
+import com.anticyscam.app.domain.model.TransferAccountState
 import com.anticyscam.app.ui.gate.AccessibilityGateScreen
 import com.anticyscam.app.ui.gate.AccessibilityGateViewModel
 import com.anticyscam.app.ui.lockdown.DailyAddLockActivity
@@ -64,28 +64,19 @@ import kotlinx.coroutines.launch
 /**
  * 防詐器主畫面。
  *
- * 兩段式啟動流程（Phase 6 + PRD § 3.3 / 3.4）：
- *  1. 使用者點擊某個綁定 App → ViewModel 設定 pendingApp → 顯示
- *     [TransferAccountPickerSheet]
- *  2. 使用者在 sheet 中點擊一筆帳號 → 依該帳號的 [TransferAccount.Status] 分流：
- *       - Default / InCooldown → 啟動 [TempUseGateActivity] 走三階段警告
- *       - Dormant              → 啟動 [DormantVerifyActivity] 一次性確認
- *       - Normal               → 複製帳號 + 直接 launchAuthorized
+ * 啟動流程（Phase 14）：
+ *  1. 使用者點擊某個綁定 App → ViewModel 設定 pendingApp → 顯示 picker sheet
+ *  2. 使用者在 sheet 中點擊一筆帳號 → 依 [TransferAccountState] 分流：
+ *       - Default / PendingMaturation → 啟動 TempUseGateActivity（< 24h 視為臨時用）
+ *       - Matured / PendingDeletion   → 直接複製帳號 + launchAuthorized
+ *       PendingDeletion 仍可被使用 — 使用者下意識挑這筆代表還在用，UI 可改按
+ *       「取消刪除」復原。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
-    // Requirement #3 (revised): the 防詐器 tab is locked behind a three-way
-    // gate (a11y + device admin + notifications). The other tabs (詐騙專區,
-    // 設定) are unaffected and continue to render normally. When any of the
-    // three requirements is missing, render the inline gate instead of the
-    // transfer-account workflow below.
     val gateViewModel: AccessibilityGateViewModel = hiltViewModel()
     val gateState by gateViewModel.state.collectAsState()
-    // 此 hiltViewModel() 是 NavBackStackEntry-scoped，跟 MainActivity 的
-    // gateViewModel 不是同一個 instance — Activity.onResume 刷不到這裡。
-    // 自己掛 lifecycle observer，每次回到前景就 refresh 一次，使用者從系統
-    // 設定回 App 才能即時看到「已啟用」。
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -104,6 +95,8 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
     val uiList by transferViewModel.uiList.collectAsState()
     val addResult by transferViewModel.addResult.collectAsState()
     val dailyState by transferViewModel.dailyState.collectAsState()
+    val dailyLockMs by transferViewModel.dailyLockRemainingMs.collectAsState()
+    val isDailyLocked = dailyLockMs > 0L
     val boundApps by mainViewModel.boundApps.collectAsState()
     val pendingApp by mainViewModel.pendingApp.collectAsState()
 
@@ -118,6 +111,7 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
     val limitMsg = stringResource(R.string.transfer_max_reached)
     val notInstalledMsg = "目標 App 已被解除安裝"
     val editsExhaustedMsg = stringResource(R.string.transfer_edits_exhausted_toast)
+    val editWindowClosedMsg = stringResource(R.string.transfer_edit_window_closed_toast)
     val dailyLockedTemplate = stringResource(R.string.daily_add_locked_remaining)
 
     LaunchedEffect(addResult) {
@@ -153,6 +147,11 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
                 snackbarHostState.showSnackbar(editsExhaustedMsg)
                 transferViewModel.consumeAddResult()
             }
+            TransferAccountViewModel.AddOutcome.EditWindowClosed -> {
+                editingAccount = null
+                snackbarHostState.showSnackbar(editWindowClosedMsg)
+                transferViewModel.consumeAddResult()
+            }
             TransferAccountViewModel.AddOutcome.Idle -> Unit
         }
     }
@@ -165,22 +164,20 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(inner)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
                 text = stringResource(R.string.nav_main),
                 color = WarningRed,
-                style = MaterialTheme.typography.headlineMedium
+                style = MaterialTheme.typography.titleLarge
             )
 
             BindAppsButton(onClick = onOpenBindApps)
 
-            Text(
-                text = "已綁定 App",
-                color = TextPrimary,
-                style = MaterialTheme.typography.titleMedium
-            )
+            // "已綁定 App" heading dropped intentionally — the icon row below
+            // is self-evident, and removing this line gives the transfer
+            // list ~28dp more vertical breathing room.
             BoundAppsRow(
                 apps = boundApps,
                 onAppClick = mainViewModel::onBoundAppClicked
@@ -193,32 +190,43 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
                 Text(
                     text = "轉帳帳號",
                     color = TextPrimary,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.weight(1f)
                 )
-                FilledTonalButton(
-                    onClick = { showAddDialog = true },
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = WarningRed,
-                        contentColor = TextPrimary
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Add,
-                        contentDescription = null,
-                        modifier = Modifier.padding(end = 4.dp)
-                    )
-                    Text("新增", style = MaterialTheme.typography.labelLarge)
+                if (!isDailyLocked) {
+                    FilledTonalButton(
+                        onClick = { showAddDialog = true },
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = WarningRed,
+                            contentColor = TextPrimary
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Add,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
+                        Text("新增", style = MaterialTheme.typography.labelLarge)
+                    }
                 }
+            }
+            // Spec #1: once daily limit triggers the 24h lockdown, hide the
+            // 新增 input path entirely and replace it with a red notice that
+            // ticks down live. Defence in depth — even if the button were
+            // somehow tapped, the repository still rejects in DailyLocked.
+            if (isDailyLocked) {
+                DailyAddLockBanner(remainingMs = dailyLockMs)
             }
             TransferAccountList(
                 items = uiList,
                 onAccountClick = { account ->
                     handleStandaloneCopy(context, account, snackbarHostState, scope, copiedMsg)
                 },
-                onAccountDelete = transferViewModel::delete,
-                onAccountEdit = { account -> editingAccount = account }
+                onRequestDelete = transferViewModel::requestDelete,
+                onCancelDelete = transferViewModel::cancelDelete,
+                onAccountEdit = { account -> editingAccount = account },
+                modifier = Modifier.weight(1f)
             )
         }
     }
@@ -247,7 +255,9 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
     if (showAddDialog) {
         AddTransferAccountDialog(
             onDismiss = { showAddDialog = false },
-            onConfirm = { name, number -> transferViewModel.addAccount(name, number) },
+            onConfirm = { name, number, bankCode ->
+                transferViewModel.addAccount(name, number, bankCode)
+            },
             showSecondAddWarning = dailyState.countToday >= 2
         )
     }
@@ -255,12 +265,13 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
     editingAccount?.let { account ->
         AddTransferAccountDialog(
             onDismiss = { editingAccount = null },
-            onConfirm = { name, number ->
-                transferViewModel.editAccount(account.id, name, number)
+            onConfirm = { name, number, bankCode ->
+                transferViewModel.editAccount(account.id, name, number, bankCode)
             },
             isEditMode = true,
             initialName = account.name,
-            initialAccountNumber = account.accountNumber
+            initialAccountNumber = account.accountNumber,
+            initialBankCode = account.bankCode.orEmpty()
         )
     }
 }
@@ -271,7 +282,7 @@ private fun BindAppsButton(onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp),
+            .height(44.dp),
         shape = RoundedCornerShape(10.dp),
         border = BorderStroke(width = 2.dp, color = WarningRed),
         colors = ButtonDefaults.outlinedButtonColors(
@@ -290,20 +301,23 @@ private fun BindAppsButton(onClick: () -> Unit) {
 private fun TransferAccountList(
     items: List<TransferAccountViewModel.AccountUi>,
     onAccountClick: (TransferAccount) -> Unit,
-    onAccountDelete: (Long) -> Unit,
-    onAccountEdit: (TransferAccount) -> Unit
+    onRequestDelete: (Long) -> Unit,
+    onCancelDelete: (Long) -> Unit,
+    onAccountEdit: (TransferAccount) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         items(items = items, key = { it.account.id }) { ui ->
             TransferAccountCard(
                 account = ui.account,
-                status = ui.status,
+                state = ui.state,
                 onClick = onAccountClick,
-                onDelete = { onAccountDelete(it.id) },
+                onRequestDelete = { onRequestDelete(it.id) },
+                onCancelDelete = { onCancelDelete(it.id) },
                 onEdit = onAccountEdit
             )
         }
@@ -326,9 +340,6 @@ private fun TransferAccountList(
     }
 }
 
-/**
- * 純複製模式 — 使用者在主清單上點擊帳號，沒有要啟動任何 App。
- */
 private fun handleStandaloneCopy(
     context: Context,
     account: TransferAccount,
@@ -342,11 +353,6 @@ private fun handleStandaloneCopy(
     scope.launch { snackbarHostState.showSnackbar(copiedMsg) }
 }
 
-/**
- * 從 picker sheet 點擊帳號：依 status 決定走哪條路。Stage gating / dormant
- * 確認都由各自的 Activity 內部負責 consume + launch；Normal 帳號才走原本
- * 「直接 copy + launchAuthorized」的快路徑。
- */
 private fun handlePickerSelection(
     context: Context,
     accountUi: TransferAccountViewModel.AccountUi,
@@ -358,9 +364,9 @@ private fun handlePickerSelection(
     notInstalledMsg: String
 ) {
     val account = accountUi.account
-    when (accountUi.status) {
-        TransferAccount.Status.Default,
-        is TransferAccount.Status.InCooldown -> {
+    when (accountUi.state) {
+        TransferAccountState.Default,
+        is TransferAccountState.PendingMaturation -> {
             viewModel.cancelPending()
             context.startActivity(
                 TempUseGateActivity.newIntent(
@@ -371,18 +377,8 @@ private fun handlePickerSelection(
                 )
             )
         }
-        TransferAccount.Status.Dormant -> {
-            viewModel.cancelPending()
-            context.startActivity(
-                DormantVerifyActivity.newIntent(
-                    context = context,
-                    accountId = account.id,
-                    targetPackage = app.packageName,
-                    accountNumber = account.accountNumber
-                )
-            )
-        }
-        TransferAccount.Status.Normal -> {
+        TransferAccountState.Matured,
+        is TransferAccountState.PendingDeletion -> {
             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             cm.setPrimaryClip(ClipData.newPlainText("transfer_account", account.accountNumber))
             scope.launch { snackbarHostState.showSnackbar(copiedMsg) }
@@ -402,4 +398,27 @@ private fun formatRemaining(ms: Long): String {
     val h = totalMin / 60
     val m = totalMin % 60
     return if (h > 0) "${h}h${m}m" else "${m}m"
+}
+
+private fun formatRemainingHms(ms: Long): String {
+    val totalSec = (ms / 1000L).coerceAtLeast(0L)
+    val h = totalSec / 3600
+    val m = (totalSec % 3600) / 60
+    val s = totalSec % 60
+    return "%02d:%02d:%02d".format(h, m, s)
+}
+
+@Composable
+private fun DailyAddLockBanner(remainingMs: Long) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 2.dp)
+    ) {
+        Text(
+            text = "今日新增上限已達 — 剩 ${formatRemainingHms(remainingMs)}",
+            color = WarningRed,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
 }

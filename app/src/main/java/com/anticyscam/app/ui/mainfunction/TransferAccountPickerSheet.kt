@@ -20,12 +20,10 @@ import com.anticyscam.app.ui.theme.TextPrimary
 import com.anticyscam.app.ui.theme.TextSecondary
 
 /**
- * Bottom sheet shown after the user taps a bound app. Forces a deliberate
- * choice — either an existing transfer recipient (account number copied)
- * or 「臨時用」(三階段警告). Dismissing without picking cancels the launch.
- *
- * 每張卡片帶有 status 徽章（🟢/🟡/💤/預設），讓使用者在分流前就看到帳號的
- * 風險狀態。實際的路由邏輯由父層的 [handlePickerSelection] 處理。
+ * Bottom sheet shown after the user taps a bound app. The picker is a
+ * read-only view: every action (edit / delete / cancel-delete) is disabled
+ * here — those belong to the main list. Routing decisions live in
+ * [handlePickerSelection] in MainFunctionScreen.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,10 +63,11 @@ fun TransferAccountPickerSheet(
                 items(items = items, key = { it.account.id }) { ui ->
                     TransferAccountCard(
                         account = ui.account,
-                        status = ui.status,
+                        state = ui.state,
                         onClick = { onAccountSelected(ui) },
-                        onDelete = { /* deletion is not allowed in this picker */ },
-                        showDelete = false
+                        onRequestDelete = { /* not available inside picker */ },
+                        onCancelDelete = { /* not available inside picker */ },
+                        showActions = false
                     )
                 }
             }
