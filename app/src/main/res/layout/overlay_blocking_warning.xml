@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Fullscreen warning overlay rendered by the AccessibilityService when a
+  bound app is foregrounded without going through 防詐器 first.
+
+  Phase H rationale: Android 12+ Background Activity Start (BAL) silently
+  blocks service-launched activities on many OEM builds, which is why
+  launching BlockingWarningActivity from inside the service did not work
+  on the user's real device. TYPE_ACCESSIBILITY_OVERLAY bypasses BAL
+  entirely — a11y services may add overlay windows without permission.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="#9B0000"
+    android:padding="32dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="⚠"
+        android:textColor="#FFFFFF"
+        android:textSize="72sp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:text="@string/warning_title"
+        android:textColor="#FFFFFF"
+        android:textSize="28sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/overlay_blocked_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center"
+        android:textColor="#F0FFFFFF"
+        android:textSize="18sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:gravity="center"
+        android:text="@string/warning_body"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp" />
+
+    <Button
+        android:id="@+id/overlay_dismiss"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="40dp"
+        android:background="#000000"
+        android:text="@string/warning_confirm"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:padding="16dp" />
+
+</LinearLayout>

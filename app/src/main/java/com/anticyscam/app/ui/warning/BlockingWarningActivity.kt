@@ -1,5 +1,6 @@
 package com.anticyscam.app.ui.warning
 
+import android.app.ActivityManager
 import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
@@ -40,7 +41,7 @@ import com.anticyscam.app.ui.theme.WarningRedDark
  *
  * - 蓋滿整個螢幕（manifest 已設定 windowFullscreen + showWhenLocked）
  * - 攔截返回鍵：使用者只能透過底部「我知道了」按鈕離開
- * - 點擊「我知道了」後：finish + 重新拉起 MainActivity（強制回到反詐器）
+ * - 點擊「我知道了」後：finish + 重新拉起 MainActivity（強制回到防詐器）
  * - launchMode=singleInstance + noHistory：避免重複的警告 Activity 疊起來
  *
  * 使用 [newIntent] 建立啟動意圖，會帶入被攔截的 packageName / label。
@@ -103,15 +104,38 @@ class BlockingWarningActivity : ComponentActivity() {
 
     private fun onConfirmReturnToHome() {
         // Bring the anti-fraud Activity to the front, then finish ourselves.
+        //
+        // Belt-and-braces: when the warning is triggered from the launcher
+        // (user tapped a bound app icon), Android often keeps the bound
+        // app's task in the foreground after we finish, dropping the user
+        // back to the bound app instead of MainActivity. We mitigate that
+        // with three layers:
+        //   1. NEW_TASK | CLEAR_TOP | SINGLE_TOP — standard reuse path
+        //   2. REORDER_TO_FRONT — explicitly reorder MainActivity's task
+        //   3. ActivityManager.AppTask.moveToFront() — direct task move
         val intent = Intent(this, MainActivity::class.java).apply {
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             )
         }
         startActivity(intent)
+        bringAntiScamTaskToFront()
         finishAndRemoveTask()
+    }
+
+    private fun bringAntiScamTaskToFront() {
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return
+        val mainClassName = MainActivity::class.java.name
+        for (task in am.appTasks) {
+            val baseActivity = task.taskInfo.baseActivity ?: continue
+            if (baseActivity.className == mainClassName) {
+                runCatching { task.moveToFront() }
+                return
+            }
+        }
     }
 
     companion object {

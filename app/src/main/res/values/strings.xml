@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">反詐器</string>
+    <string name="app_name">防詐器</string>
 
     <!-- Bottom navigation -->
-    <string name="nav_main">反詐器</string>
+    <string name="nav_main">防詐器</string>
     <string name="nav_scam_info">詐騙專區</string>
     <string name="nav_setting">設定</string>
 
     <!-- Accessibility gate (Phase 2) -->
     <string name="gate_title">請啟用無障礙服務</string>
-    <string name="gate_subtitle">反詐器需要無障礙服務才能保護您的轉帳安全</string>
-    <string name="gate_reason">為了在您打開網銀／支付類 App 時提醒您，反詐器必須在「設定 → 無障礙」中啟用。未啟用前無法進入。</string>
+    <string name="gate_subtitle">防詐器需要無障礙服務才能保護您的轉帳安全</string>
+    <string name="gate_reason">為了在您打開網銀／支付類 App 時提醒您，防詐器必須在「設定 → 無障礙」中啟用。未啟用前無法進入。</string>
     <string name="gate_open_settings">前往無障礙設定</string>
     <string name="gate_status_disabled">尚未啟用</string>
     <string name="gate_status_enabled">已啟用</string>
@@ -22,6 +22,9 @@
     <string name="transfer_default_name">臨時用</string>
     <string name="transfer_default_purpose">預設帳號</string>
     <string name="transfer_add_title">新增轉帳帳號</string>
+    <string name="transfer_edit_title">編輯轉帳帳號</string>
+    <string name="transfer_edit_warning">每筆帳號只能編輯 1 次。儲存後本筆帳號將只剩刪除選項。\n若您是因為他人指示而修改，請立即停手並撥打 165。</string>
+    <string name="transfer_edits_exhausted_toast">本筆帳號的編輯次數已用完，僅能刪除</string>
     <string name="transfer_max_reached">最多只能新增 5 筆轉帳帳號</string>
     <string name="transfer_field_name">姓名／用途</string>
     <string name="transfer_field_account">轉帳帳號</string>
@@ -30,11 +33,88 @@
     <string name="transfer_copied">已複製帳號至剪貼簿</string>
 
     <!-- Warning (Phase 8) -->
-    <string name="warning_title">請從反詐器進入</string>
-    <string name="warning_body">為了避免您轉帳到錯誤的帳戶，請回到反詐器並從反詐器內進入此 App。</string>
+    <string name="warning_title">請從防詐器進入</string>
+    <string name="warning_body">為了避免您轉帳到錯誤的帳戶，請回到防詐器並從防詐器內進入此 App。</string>
     <string name="warning_confirm">我知道了</string>
+    <string name="warning_blocked_label_format">被攔截：%1$s</string>
 
     <!-- Accessibility service (Phase 7) -->
-    <string name="accessibility_service_label">反詐器保護服務</string>
-    <string name="accessibility_service_description">當您嘗試打開已綁定的 App（例如網銀）卻不是從反詐器進入時，反詐器會跳出警告並把您帶回反詐器確認。此服務不會收集您的任何個人資料。</string>
+    <string name="accessibility_service_label">防詐器保護服務</string>
+    <string name="accessibility_service_description">當您嘗試打開已綁定的 App（例如網銀）卻不是從防詐器進入時，防詐器會跳出警告並把您帶回防詐器確認。此服務不會收集您的任何個人資料。</string>
+
+    <!-- Foreground service + Device Admin (PRD §8) -->
+    <string name="foreground_service_title">防詐器保護中</string>
+    <string name="foreground_service_text">背景監測中，正在守護您的轉帳安全</string>
+    <string name="device_admin_label">防詐器裝置守護</string>
+    <string name="device_admin_description">啟用後可避免防詐器被誤刪除，提高保護完整性。可隨時於系統設定中關閉。</string>
+    <string name="device_admin_disable_warning">關閉裝置管理員將解除防詐器的防誤刪保護。建議保持開啟以確保功能完整。</string>
+
+    <!-- Main-function tab inline gate (requirement #3, revised) -->
+    <string name="gate_inline_title">啟用防詐器保護</string>
+    <string name="gate_inline_subtitle">以下三項全部啟用後，才能使用防詐器轉帳保護功能</string>
+    <string name="gate_item_a11y">無障礙服務</string>
+    <string name="gate_item_a11y_desc">攔截綁定 App 的直接開啟並提醒</string>
+    <string name="gate_item_admin">裝置管理員</string>
+    <string name="gate_item_admin_desc">防止防詐器被誤刪除</string>
+    <string name="gate_item_notify">通知權限</string>
+    <string name="gate_item_notify_desc">顯示「防詐器保護中」常駐通知</string>
+    <string name="gate_item_battery">電池白名單</string>
+    <string name="gate_item_battery_desc">允許防詐器背景持續執行，不被省電強制關閉</string>
+    <string name="gate_battery_hint">點下後系統會彈出對話框詢問是否允許「不受電池優化」，請選「允許」</string>
+    <string name="gate_action_enable">前往啟用</string>
+    <string name="gate_status_on">已啟用</string>
+    <string name="gate_status_off">尚未啟用</string>
+    <string name="gate_all_ready_hint">三項全部啟用後，畫面會自動切換為防詐器主功能</string>
+    <string name="gate_admin_fallback_hint">此版本系統未提供「啟用裝置管理員」直接入口，請手動點選：設定 → 安全 → 裝置管理員應用程式 → 開啟「防詐器」</string>
+    <string name="gate_accessibility_open_hint">若沒看到「防詐器」開關，請在清單中向下捲動找「防詐器保護服務」</string>
+    <string name="gate_launch_failed">無法開啟系統設定（%1$s），請手動到 設定 App 內開啟</string>
+
+    <!-- Temp-use stage 1 (green pass-through, PRD § 3.3) -->
+    <string name="temp_use_stage1_title">提醒</string>
+    <string name="temp_use_stage1_body">這筆帳號目前屬於「臨時用」狀態（新增未滿 24 小時或選擇了預設臨時用）。\n請確認您信任這次轉帳對象，並再次核對對方帳號是否正確。</string>
+    <string name="temp_use_stage1_cta">我已確認，繼續</string>
+
+    <!-- Temp-use stage 2 (yellow forced calm + 3-checkbox) -->
+    <string name="temp_use_stage2_title">第 2 次臨時轉帳警告</string>
+    <string name="temp_use_stage2_body">10 分鐘內第 2 次臨時轉帳。\n165 統計：被害人平均損失 78 萬。\n您可能正在被詐騙。</string>
+    <string name="temp_use_stage2_calm_label">冷靜倒數</string>
+    <string name="temp_use_stage2_check1">政府/銀行不會要求你匯款給對方</string>
+    <string name="temp_use_stage2_check2">政府/銀行不會要求你操作ATM</string>
+    <string name="temp_use_stage2_check3">與其事後檢討，不如下方撥打 165</string>
+    <string name="temp_use_stage2_cta">確認，繼續轉帳</string>
+    <string name="temp_use_stage2_call_165">立即撥打 165</string>
+    <string name="temp_use_stage2_countdown">剩餘 %1$d 秒</string>
+
+    <!-- Temp-use stage 3 (red lockdown + auto-dial 165) -->
+    <string name="temp_use_stage3_title">⚠️ 您正在被詐騙</string>
+    <string name="temp_use_stage3_body">10 分鐘內第 3 次臨時轉帳。\n這是詐騙集團「逼迫快速轉帳」的標準手法。\n您正在被詐騙。</string>
+    <string name="temp_use_stage3_call_cta">立即撥打 165</string>
+    <string name="temp_use_stage3_locked_note">本次轉帳已被防詐器封鎖。\n剩餘冷卻時間：%1$s</string>
+    <string name="temp_use_calm_mantra">錢掉進水裡還有響聲，掉進詐騙口袋連灰都不剩下，別讓你的餘生，只剩下「後悔」兩個字</string>
+
+    <!-- Temp-use lockout (post-3rd, 5min cooldown) -->
+    <string name="temp_use_locked_title">已封鎖 5 分鐘</string>
+    <string name="temp_use_locked_body">為了保護您的資產，防詐器已暫時封鎖臨時轉帳。\n剩餘冷卻時間：%1$s</string>
+    <string name="temp_use_locked_call">撥打 165 諮詢</string>
+
+    <!-- Daily-add lockdown screen (畫面 10) -->
+    <string name="daily_add_lock_title">⚠️ 偵測到異常新增行為</string>
+    <string name="daily_add_lock_body">您今日已新增 3 筆轉帳帳號，這是常見的詐騙誘導模式。\n為了您的資產安全，新增功能已封鎖 24 小時。</string>
+    <string name="daily_add_lock_call">立即撥打 165 防詐諮詢</string>
+    <string name="daily_add_lock_return">返回防詐器</string>
+    <string name="daily_add_lock_warn_2">提醒：您今日已新增 2 筆帳號。再新增 1 筆將觸發 24 小時封鎖。</string>
+    <string name="daily_add_locked_remaining">新增功能仍在封鎖中，剩餘 %1$s</string>
+
+    <!-- Account status badges (cards) -->
+    <string name="account_status_default">預設</string>
+    <string name="account_status_normal">🟢 常用</string>
+    <string name="account_status_cooldown">🟡 冷卻中</string>
+    <string name="account_status_dormant">💤 久未使用</string>
+    <string name="account_cooldown_remaining">剩 %1$s</string>
+
+    <!-- Dormant verification (90-day reuse) -->
+    <string name="dormant_title">確認此帳號仍可信任</string>
+    <string name="dormant_body">這筆帳號已超過 90 天未使用。\n為避免被詐騙利用舊帳號，請再次與對方本人確認後再繼續。</string>
+    <string name="dormant_check">我已親自確認對方本人與此帳號</string>
+    <string name="dormant_cta">確認，繼續轉帳</string>
 </resources>

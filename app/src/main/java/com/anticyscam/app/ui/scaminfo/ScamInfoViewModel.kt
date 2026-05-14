@@ -49,11 +49,23 @@ class ScamInfoViewModel @Inject constructor(
     }
 
     fun onCategorySelected(categoryId: String?) {
-        _state.update { it.copy(selectedCategoryId = categoryId) }
+        // Phase L2: any explicit chip tap locks the user's category preference
+        // so the auto-jump (see visibleTactics) won't override it for the
+        // remainder of this search session.
+        _state.update { it.copy(selectedCategoryId = categoryId, manualCategoryChange = true) }
     }
 
     fun onSearchChanged(query: String) {
-        _state.update { it.copy(searchQuery = query) }
+        // Phase L2: when the user starts a fresh search (blank → non-blank),
+        // reset manualCategoryChange so the new query can auto-jump across
+        // categories. Mid-search edits and clears leave the flag alone.
+        _state.update {
+            val startingNewSearch = it.searchQuery.isBlank() && query.isNotBlank()
+            it.copy(
+                searchQuery = query,
+                manualCategoryChange = if (startingNewSearch) false else it.manualCategoryChange
+            )
+        }
     }
 
     fun onTacticExpanded(tacticId: String) {
@@ -80,20 +92,31 @@ data class ScamInfoState(
     val allTactics: List<ScamTactic> = emptyList(),
     val selectedCategoryId: String? = null,
     val searchQuery: String = "",
-    val expandedTacticIds: Set<String> = emptySet()
+    val expandedTacticIds: Set<String> = emptySet(),
+    val manualCategoryChange: Boolean = false
 ) {
     val visibleTactics: List<ScamTactic>
         get() {
-            val byCategory = selectedCategoryId
-                ?.let { id -> allTactics.filter { it.categoryId == id } }
-                ?: allTactics
             val query = searchQuery.trim()
-            if (query.isEmpty()) return byCategory
-            return byCategory.filter { tactic ->
+            val inCategory: (ScamTactic) -> Boolean = { tactic ->
+                selectedCategoryId == null || tactic.categoryId == selectedCategoryId
+            }
+            if (query.isEmpty()) return allTactics.filter(inCategory)
+            val matchesQuery: (ScamTactic) -> Boolean = { tactic ->
                 tactic.title.contains(query, ignoreCase = true) ||
                     tactic.description.contains(query, ignoreCase = true) ||
                     tactic.tags.any { tag -> tag.contains(query, ignoreCase = true) }
             }
+            val filtered = allTactics.filter { inCategory(it) && matchesQuery(it) }
+            // Phase L2: if the active category yields nothing for this search
+            // but the query *does* match elsewhere, fall through to a global
+            // match — unless the user explicitly chose this category since the
+            // search began (manualCategoryChange). Goal: surface a result so
+            // the user sees the search is working, not an empty page.
+            if (filtered.isEmpty() && !manualCategoryChange && selectedCategoryId != null) {
+                return allTactics.filter(matchesQuery)
+            }
+            return filtered
         }
 
     fun severityCount(severity: ScamSeverity): Int =

@@ -1,6 +1,6 @@
 # Changelog
 
-本檔記錄反詐器的版本變更。格式參考 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.1.0/)
+本檔記錄防詐器的版本變更。格式參考 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.1.0/)
 並遵循 [Semantic Versioning](https://semver.org/lang/zh-TW/)。
 
 ## [0.1.0] - 2026-05-12
@@ -12,7 +12,7 @@
 - 未啟用前無法進入主畫面
 - 偵測使用者開啟系統設定後自動回到 App 並重新檢查
 
-**主功能（反詐器）**
+**主功能（防詐器）**
 - 「綁定／解除 APP」按鈕（紅框黑底）
 - 列出手機已安裝 App 供使用者勾選綁定
 - 主畫面顯示已綁定 App tile（橫向 LazyRow）
@@ -57,4 +57,4 @@
 
 - 部分中國定製 ROM（MIUI／EMUI／OriginOS）需要手動關閉「自啟動」與「電池優化」限制
 - Android 14+ 對背景 Activity start 有額外限制 — 已加 GLOBAL_ACTION_HOME 作為防線
-- 60 秒授權視窗 — 點擊 App 後 1 分鐘內未實際進入則需重新從反詐器啟動
+- 60 秒授權視窗 — 點擊 App 後 1 分鐘內未實際進入則需重新從防詐器啟動

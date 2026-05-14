@@ -8,7 +8,7 @@ import javax.inject.Singleton
 
 /**
  * Tracks short-lived launch authorizations. When the user explicitly
- * chooses to launch a bound app from inside 反詐器, we mark its package
+ * chooses to launch a bound app from inside 防詐器, we mark its package
  * as "authorized for the next N seconds". The AccessibilityService
  * checks this tracker on each foreground-app transition — if the app
  * appears WITHOUT a fresh authorization, the blocking warning fires.

@@ -11,11 +11,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anticyscam.app.domain.model.BoundApp
+import com.anticyscam.app.ui.components.AppIcon
 import com.anticyscam.app.ui.theme.SurfaceDim
 import com.anticyscam.app.ui.theme.TextPrimary
 import com.anticyscam.app.ui.theme.WarningRed
@@ -79,11 +77,10 @@ private fun BoundAppTile(app: BoundApp, onClick: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Icon(
-                imageVector = Icons.Filled.Apps,
-                contentDescription = null,
-                tint = WarningRed,
-                modifier = Modifier.size(36.dp)
+            AppIcon(
+                packageName = app.packageName,
+                modifier = Modifier.size(36.dp),
+                fallbackTint = WarningRed
             )
             Text(
                 text = app.label,

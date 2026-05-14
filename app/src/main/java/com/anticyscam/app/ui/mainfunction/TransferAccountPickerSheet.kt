@@ -15,7 +15,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.anticyscam.app.domain.model.BoundApp
-import com.anticyscam.app.domain.model.TransferAccount
 import com.anticyscam.app.ui.theme.SurfaceElevated
 import com.anticyscam.app.ui.theme.TextPrimary
 import com.anticyscam.app.ui.theme.TextSecondary
@@ -23,16 +22,18 @@ import com.anticyscam.app.ui.theme.TextSecondary
 /**
  * Bottom sheet shown after the user taps a bound app. Forces a deliberate
  * choice — either an existing transfer recipient (account number copied)
- * or "臨時用" (proceed without copying). Either way, dismissing without
- * picking cancels the launch.
+ * or 「臨時用」(三階段警告). Dismissing without picking cancels the launch.
+ *
+ * 每張卡片帶有 status 徽章（🟢/🟡/💤/預設），讓使用者在分流前就看到帳號的
+ * 風險狀態。實際的路由邏輯由父層的 [handlePickerSelection] 處理。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransferAccountPickerSheet(
     pendingApp: BoundApp,
-    accounts: List<TransferAccount>,
+    items: List<TransferAccountViewModel.AccountUi>,
     sheetState: SheetState,
-    onAccountSelected: (TransferAccount) -> Unit,
+    onAccountSelected: (TransferAccountViewModel.AccountUi) -> Unit,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(
@@ -52,7 +53,7 @@ fun TransferAccountPickerSheet(
                 style = MaterialTheme.typography.titleLarge
             )
             Text(
-                text = "請先選擇要轉帳的對象，反詐器會複製對應帳號並開啟 App。若僅是登入查看，請選「臨時用」。",
+                text = "請先選擇要轉帳的對象，防詐器會複製對應帳號並開啟 App。若僅是登入查看，請選「臨時用」。",
                 color = TextSecondary,
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -61,10 +62,11 @@ fun TransferAccountPickerSheet(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(items = accounts, key = { it.id }) { account ->
+                items(items = items, key = { it.account.id }) { ui ->
                     TransferAccountCard(
-                        account = account,
-                        onClick = { onAccountSelected(account) },
+                        account = ui.account,
+                        status = ui.status,
+                        onClick = { onAccountSelected(ui) },
                         onDelete = { /* deletion is not allowed in this picker */ },
                         showDelete = false
                     )

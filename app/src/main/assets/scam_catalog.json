@@ -1,8 +1,8 @@
 {
-  "version": 1,
+  "version": 2,
   "lastUpdated": "2026-05-13",
-  "source": "整理自 165 反詐騙諮詢專線、內政部警政署、金管會、165 LINE 官方帳號公開資訊",
-  "notice": "本清單為衛教用途，內容為常見手法摘要，實際案例請以 165 公告為準。",
+  "source": "整理自 165 反詐騙諮詢專線、內政部警政署、刑事警察局、金管會、衛福部、財政部、165 LINE 官方帳號公開資訊",
+  "notice": "本清單為衛教用途，整合台灣高發詐騙手法摘要。實際個案請以 165 公告與警方查證為準。",
   "channels": [
     {
       "id": "phone_165",
@@ -62,17 +62,17 @@
     {
       "id": "fake_authority",
       "displayName": "假冒公務／檢警",
-      "shortDesc": "冒充檢察官、警察、健保局、衛福部要求監管帳戶"
+      "shortDesc": "冒充檢察官、警察、健保局、稅捐處、台電等公部門"
     },
     {
       "id": "phishing",
       "displayName": "釣魚／個資騙取",
-      "shortDesc": "假網銀、假電商、假物流 SMS 與短網址陷阱"
+      "shortDesc": "假網銀、假電商、假物流、假發票等釣魚陷阱"
     },
     {
       "id": "romance",
       "displayName": "假交友／愛情詐騙",
-      "shortDesc": "交友 App、社群陌生來訊、迅速建立感情後誘導匯款"
+      "shortDesc": "交友 App、社群陌生來訊、迅速建立感情後誘導匯款／投資"
     },
     {
       "id": "fake_purchase",
@@ -98,6 +98,21 @@
       "id": "sextortion",
       "displayName": "色情勒索",
       "shortDesc": "視訊裸聊截圖、合成不雅照恐嚇匯款"
+    },
+    {
+      "id": "gambling",
+      "displayName": "賭博／簽牌詐騙",
+      "shortDesc": "假必殺技、明牌、地下運彩、職棒簽賭等套路"
+    },
+    {
+      "id": "crypto_wallet",
+      "displayName": "加密貨幣錢包詐騙",
+      "shortDesc": "假空投、錢包私鑰外洩、假 NFT 交易市場"
+    },
+    {
+      "id": "tech_support",
+      "displayName": "假客服／假技術支援",
+      "shortDesc": "冒充 Apple／微軟／Google／路由器廠商遠端控制裝置"
     }
   ],
   "tactics": [
@@ -146,6 +161,76 @@
       "protection": "境外外匯保證金交易在台灣未經核准者皆屬非法。先查金管會合法名單再決定。"
     },
     {
+      "id": "investment_ai_robot",
+      "categoryId": "investment",
+      "title": "AI 機器人／量化交易",
+      "severity": "HIGH",
+      "tags": ["AI機器人", "量化交易", "假科技"],
+      "description": "用「AI 自動下單、月報酬 20%」、「量化套利」包裝，要求把資金匯入「機器人託管帳戶」或購買「演算法授權」。",
+      "redFlags": [
+        "標榜 AI／量化但操作介面極粗糙",
+        "用「老師」、「主管」階層制壓力推銷",
+        "強調早期投入者享高分潤、晚進就沒了"
+      ],
+      "protection": "真正合法的程式交易由本人券商帳戶執行，資金不會交給對方。看到「AI 保證月報酬」直接視為詐騙。"
+    },
+    {
+      "id": "investment_ponzi",
+      "categoryId": "investment",
+      "title": "吸金老鼠會／多層次傳銷",
+      "severity": "CRITICAL",
+      "tags": ["吸金", "老鼠會", "拉下線"],
+      "description": "標榜「高息穩賺」、「拉下線抽成」，初期確實有少量配息（拿後加入者的錢），規模一旦放大隨即崩盤。",
+      "redFlags": [
+        "收益主要來自「拉人入會」而非實際商品營收",
+        "要求一次性大額投入並簽 NDA",
+        "用「公司即將上市」、「IPO 原始股」話術"
+      ],
+      "protection": "金管會未核准的吸金行為違反銀行法。任何標榜「保證高息」的方案請查證金管會公告再決定。"
+    },
+    {
+      "id": "investment_stock_pump",
+      "categoryId": "investment",
+      "title": "假內線／明牌拉抬出貨",
+      "severity": "HIGH",
+      "tags": ["內線", "明牌", "炒股"],
+      "description": "群組「老師」連續報幾支小型股賺錢，建立信任後集中推一檔，鼓動會員大量買入拉抬，待散戶接手後對方獲利出場。",
+      "redFlags": [
+        "強調「主力建倉中」、「下週公告利多」",
+        "要求集中時段同時買進指定價位",
+        "對方無法說明資訊來源、僅稱「內線」"
+      ],
+      "protection": "操縱股價屬證交法重罪。任何宣稱「內線」、「主力訊息」皆涉嫌違法，跟單會被連帶調查。"
+    },
+    {
+      "id": "investment_ipo_pre",
+      "categoryId": "investment",
+      "title": "假未上市／IPO 原始股",
+      "severity": "HIGH",
+      "tags": ["未上市", "原始股", "IPO"],
+      "description": "業務電話或 LINE 推銷「即將 IPO」、「上市前最後一輪原始股」，要求匯款購買實際無價值或虛構的股票。",
+      "redFlags": [
+        "強調「上市倒數」、「機會稀缺」",
+        "股權移轉只用紙本契約，沒有集保託管",
+        "公司資訊在公開資訊觀測站查無"
+      ],
+      "protection": "未上市股票交易風險極高，且多無集中保管。先至公開資訊觀測站、商工登記查核公司真實性。"
+    },
+    {
+      "id": "investment_offshore_fund",
+      "categoryId": "investment",
+      "title": "假境外基金／結構商品",
+      "severity": "MEDIUM",
+      "tags": ["境外基金", "結構商品", "假理專"],
+      "description": "冒充銀行理專或私人銀行家，推銷「高評等海外基金」、「保本結構債」，要求匯款至境外帳戶或人頭戶。",
+      "redFlags": [
+        "理專透過私人 LINE 而非銀行 App 連絡",
+        "要求把錢匯到不是自己名下的帳戶",
+        "強調「不會留下紀錄」、「客戶獨享」"
+      ],
+      "protection": "合法理財商品申購一律透過銀行櫃台或自己網銀，款項進入自己名下信託專戶。任何「私下匯款」皆有問題。"
+    },
+    {
       "id": "fake_prosecutor",
       "categoryId": "fake_authority",
       "title": "假檢察官／假警察「監管帳戶」",
@@ -175,6 +260,76 @@
       "protection": "健保局不會主動電話告知您涉案。掛斷後請撥 165 或 0800-030-598（健保署）查證。"
     },
     {
+      "id": "fake_authority_postal",
+      "categoryId": "fake_authority",
+      "title": "假冒郵局／快遞「包裹涉案」",
+      "severity": "MEDIUM",
+      "tags": ["假郵局", "海關", "假檢警"],
+      "description": "自稱郵局／DHL／FedEx 通知「包裹內含違禁品涉案」，再「轉接警察」開始監管帳戶劇本。",
+      "redFlags": [
+        "要求保密、轉接警局",
+        "對方能說出你的姓名地址",
+        "話術引導你照「警察」指示操作"
+      ],
+      "protection": "包裹遞送公司不會以電話告知您涉刑案。掛斷後至中華郵政／DHL／FedEx 官方客服查詢。"
+    },
+    {
+      "id": "fake_tax_bureau",
+      "categoryId": "fake_authority",
+      "title": "假國稅局「退稅／補稅」",
+      "severity": "HIGH",
+      "tags": ["假國稅", "退稅", "ATM"],
+      "description": "電話或簡訊聲稱您的「綜所稅退稅成功／需補稅」，要求至 ATM 操作以「核對退稅碼」。",
+      "redFlags": [
+        "要求至 ATM 操作以「領取」退稅",
+        "退稅金額異常高",
+        "要求加入「國稅局 LINE」協助辦理"
+      ],
+      "protection": "國稅局退稅一律入您自己名下帳戶或郵局劃撥。ATM 並無「退稅領取」功能。任何 ATM 指示皆為詐騙。"
+    },
+    {
+      "id": "fake_taipower",
+      "categoryId": "fake_authority",
+      "title": "假台電／自來水「欠費停電」",
+      "severity": "MEDIUM",
+      "tags": ["假台電", "假自來水", "欠費"],
+      "description": "自稱台電／自來水公司，告知「逾期欠費將停電／停水」，提供假繳費 LINE 或要求至超商代收非官方條碼。",
+      "redFlags": [
+        "電話催繳並威脅立即停電",
+        "提供短網址繳費連結",
+        "要求加 LINE 客服處理"
+      ],
+      "protection": "台電催繳僅以書面通知與官方 95168 客服。請以台電 App／官網查詢真實帳單，切勿用簡訊提供的連結。"
+    },
+    {
+      "id": "fake_immigration",
+      "categoryId": "fake_authority",
+      "title": "假移民署／護照涉案",
+      "severity": "MEDIUM",
+      "tags": ["假移民署", "護照", "假檢警"],
+      "description": "電話冒稱移民署，告知您的護照／居留證遭冒用涉跨國刑案，再轉警察進入監管帳戶話術。",
+      "redFlags": [
+        "用普通話／英語混合恐嚇",
+        "要求口述護照號碼與隨機問題核身",
+        "話術強調案件「跨國保密」"
+      ],
+      "protection": "移民署不會用電話通知民眾涉案。立即掛斷並撥內政部移民署 1990 或 165 查證。"
+    },
+    {
+      "id": "fake_customs",
+      "categoryId": "fake_authority",
+      "title": "假關務署／國際包裹通關費",
+      "severity": "MEDIUM",
+      "tags": ["假關務", "海關", "通關費"],
+      "description": "簡訊或電話聲稱「您的國際包裹需補繳關稅／檢驗費」，附假繳費連結或要求至 ATM 操作。",
+      "redFlags": [
+        "您並未網購海外商品卻收到此通知",
+        "通關費需即時匯款",
+        "提供短網址或私人收款帳戶"
+      ],
+      "protection": "正式進口通關費透過快遞公司收取，可至關務署「線上單一窗口」查詢。先確認自己的包裹來源再行動。"
+    },
+    {
       "id": "phishing_sms_bank",
       "categoryId": "phishing",
       "title": "假網銀／釣魚簡訊連結",
@@ -186,7 +341,7 @@
         "頁面要求一次輸入帳號、密碼、OTP",
         "頁面樣式與你印象中的網銀略有差異"
       ],
-      "protection": "切勿從訊息點擊連結。請使用反詐器內已綁定的網銀 App 開啟。若已點擊，立即停用網銀、撥銀行客服。"
+      "protection": "切勿從訊息點擊連結。請使用防詐器內已綁定的網銀 App 開啟。若已點擊，立即停用網銀、撥銀行客服。"
     },
     {
       "id": "phishing_delivery_sms",
@@ -217,6 +372,90 @@
       "protection": "正式罰單透過郵局或政府機關寄送，並可透過監理服務 App 查詢。不要掃描來路不明 QR。"
     },
     {
+      "id": "phishing_streaming",
+      "categoryId": "phishing",
+      "title": "假串流／訂閱續約釣魚",
+      "severity": "MEDIUM",
+      "tags": ["釣魚信", "Netflix", "Apple"],
+      "description": "Email 通知「Netflix／Apple ID／Google 訂閱付款失敗」，附「更新付款」連結進入假網頁。",
+      "redFlags": [
+        "寄件 Email 網域與官方不同",
+        "信中連結 hover 顯示陌生網域",
+        "頁面要求一次輸入完整卡號、安全碼、生日"
+      ],
+      "protection": "請從原 App／官網直接登入查看，不要從信件連結。可於 Apple／Google 帳戶頁查看真實付款狀態。"
+    },
+    {
+      "id": "phishing_etag",
+      "categoryId": "phishing",
+      "title": "假 ETC／高速公路通行費",
+      "severity": "HIGH",
+      "tags": ["假ETC", "通行費", "釣魚簡訊"],
+      "description": "簡訊聲稱「您的車牌 ETC 通行費逾期」，附短網址連結進入假遠通網頁，要求輸入信用卡完成「補繳」。",
+      "redFlags": [
+        "您車上根本沒裝 ETC 或未行駛該路段",
+        "連結網域非 fetc.net.tw",
+        "頁面要求填寫信用卡 + 卡背 3 碼"
+      ],
+      "protection": "ETC 補繳請至 fetc.net.tw 官網或遠通電收 App 操作。簡訊連結一律當作釣魚處理。"
+    },
+    {
+      "id": "phishing_invoice",
+      "categoryId": "phishing",
+      "title": "假電子發票中獎通知",
+      "severity": "MEDIUM",
+      "tags": ["電子發票", "中獎", "釣魚"],
+      "description": "Email／簡訊「您的電子發票中獎」附連結進入假財政部頁面，要求輸入身分證、銀行帳號、信用卡以「核發獎金」。",
+      "redFlags": [
+        "未開啟雲端發票卻收到中獎通知",
+        "連結網域非 invoice.etax.nat.gov.tw",
+        "頁面要求輸入信用卡資料領獎"
+      ],
+      "protection": "雲端發票中獎可至財政部電子發票整合服務平台或自己的發票載具 App 核對，獎金自動匯入綁定帳戶不需要填卡號。"
+    },
+    {
+      "id": "phishing_apple_id",
+      "categoryId": "phishing",
+      "title": "假 Apple ID 鎖定／登入警告",
+      "severity": "HIGH",
+      "tags": ["AppleID", "iCloud", "釣魚"],
+      "description": "Email／簡訊聲稱您的 Apple ID 已被鎖定，請點擊連結「重新驗證」，導入假 appleid 頁面騙取帳密與雙重驗證碼。",
+      "redFlags": [
+        "寄件人網域為 appleid-support.com 等仿冒",
+        "頁面同時要求 Apple ID 密碼與信用卡",
+        "簡訊內連結為短網址"
+      ],
+      "protection": "Apple ID 異常一律從 iPhone「設定 → Apple ID」內檢查。切勿從 Email／簡訊連結登入。"
+    },
+    {
+      "id": "phishing_facebook_login",
+      "categoryId": "phishing",
+      "title": "假 FB／IG 安全警告",
+      "severity": "MEDIUM",
+      "tags": ["FB", "IG", "假管理員"],
+      "description": "「您的粉絲頁／帳號違反社群守則，24 小時內未驗證將停權」附假登入頁，騙取 FB/IG 帳密。對小編、代購、賣家最常見。",
+      "redFlags": [
+        "頁面是 facebook-security-xxx 等仿冒",
+        "強調 24 小時倒數",
+        "要求填寫 2FA 驗證碼"
+      ],
+      "protection": "Meta 不會用 Messenger／IG 私訊通知違規。請從 facebook.com／instagram.com 主動登入檢查通知。"
+    },
+    {
+      "id": "phishing_post_redelivery",
+      "categoryId": "phishing",
+      "title": "假中華郵政重新派送",
+      "severity": "MEDIUM",
+      "tags": ["假郵局", "重新派送", "APK"],
+      "description": "簡訊「您的掛號信派送失敗，請點選連結預約重送」實為釣魚或誘導下載惡意 APK。",
+      "redFlags": [
+        "您並未等待掛號信",
+        "連結要求安裝「中華郵政 App」APK",
+        "頁面要求信用卡資料"
+      ],
+      "protection": "中華郵政重新投遞請使用官方 App 或臨櫃辦理。Android 不要安裝來源不明 APK。"
+    },
+    {
       "id": "romance_dating_app",
       "categoryId": "romance",
       "title": "交友 App 假感情詐財",
@@ -234,7 +473,7 @@
     {
       "id": "romance_strangers_dm",
       "categoryId": "romance",
-      "title": "Instagram／Line 陌生來訊",
+      "title": "Instagram／LINE 陌生來訊",
       "severity": "HIGH",
       "tags": ["陌生來訊", "假帳號"],
       "description": "陌生帳號加你 LINE／IG，「你好像我朋友」、「打錯」破冰後熱絡聊天，再邀你進投資群組或匯款。",
@@ -244,6 +483,64 @@
         "幾天內就邀你加投資群"
       ],
       "protection": "陌生人主動加好友且很快談錢／投資，請封鎖。可截圖回報 165 LINE @165。"
+    },
+    {
+      "id": "romance_foreign_military",
+      "categoryId": "romance",
+      "title": "假外國軍人／工程師",
+      "severity": "HIGH",
+      "tags": ["假外國人", "美軍", "假愛情"],
+      "description": "FB／IG 自稱駐外美軍、聯合國醫師、跨國工程師，包裝高大上身份，最終以「包裹卡海關需付保證金」、「家人手術急需現金」勒索匯款。",
+      "redFlags": [
+        "自稱駐敘利亞／阿富汗／烏克蘭軍人",
+        "頭像為網路爬取的軍裝照（可反搜尋）",
+        "用蹩腳中文／全英文溝通",
+        "卡關鍵時刻要錢"
+      ],
+      "protection": "真正美軍／聯合國人員不會私訊台灣民眾要求匯款。圖片可用 Google 反向搜尋查證。"
+    },
+    {
+      "id": "romance_doctor_war",
+      "categoryId": "romance",
+      "title": "假海外醫師／戰地義工",
+      "severity": "HIGH",
+      "tags": ["假醫師", "戰地", "感情詐騙"],
+      "description": "包裝「無國界醫師」、「烏克蘭志工」等故事，以「藥品款項被海關扣留」、「需匯款支付工地保險」誘騙金錢。",
+      "redFlags": [
+        "強調「在戰區無法視訊」",
+        "提供偽造的身分證件照片",
+        "永遠在無法見面、又需要錢的處境"
+      ],
+      "protection": "戰地醫師的薪資由所屬機構處理，不會由台灣陌生網友匯款。一旦開口要錢即為詐騙。"
+    },
+    {
+      "id": "romance_pig_butchering",
+      "categoryId": "romance",
+      "title": "殺豬盤（養豬殺豬）",
+      "severity": "CRITICAL",
+      "tags": ["殺豬盤", "假投資戀人", "長線詐騙"],
+      "description": "歹徒花費數週至數月與你建立深度感情，介紹「我自己的投資管道」，先讓你小金額獲利、再誘導投入畢生積蓄、然後直接關站。",
+      "redFlags": [
+        "對方堅持「只跟你分享」這個機會",
+        "投資 App 是非官方商店或 Web 版",
+        "初期可提領、加碼後卡關",
+        "客服永遠是「上面在處理」"
+      ],
+      "protection": "凡是「網路上的伴侶帶你投資」一律是殺豬盤。可提領的小錢只是引誘加碼的鉤子。"
+    },
+    {
+      "id": "romance_overseas_taishang",
+      "categoryId": "romance",
+      "title": "假台商海外投資戀人",
+      "severity": "MEDIUM",
+      "tags": ["假台商", "東南亞投資", "感情詐騙"],
+      "description": "自稱在越南／柬埔寨／杜拜經商的台灣人，邀你共同投資工廠、礦場、加密貨幣套利。",
+      "redFlags": [
+        "「我們可以一起經營這家公司」",
+        "資金匯款指向境外帳戶",
+        "聲稱回台時間總是延期"
+      ],
+      "protection": "東南亞跨國投資需透過合法律師、會計師查核。任何「我幫你代操」一律拒絕。"
     },
     {
       "id": "fake_shop_refund",
@@ -274,6 +571,62 @@
       "protection": "優先使用提供買家保護的平台（蝦皮、PChome、momo）。私下匯款幾乎沒有救濟管道。"
     },
     {
+      "id": "fake_concert_ticket",
+      "categoryId": "fake_purchase",
+      "title": "假演唱會／黃牛票",
+      "severity": "HIGH",
+      "tags": ["演唱會", "黃牛", "假售票"],
+      "description": "FB 社團、Threads、Dcard 出現「轉售低於原價演唱會票」，匯款後封鎖；常見於 BLACKPINK、五月天、Taylor Swift 等熱門場。",
+      "redFlags": [
+        "賣家不願走拓元／KKTIX 轉讓",
+        "要求先匯全款，演唱會當天才寄入場碼",
+        "圖片是網路截圖、找不到票面條碼"
+      ],
+      "protection": "演唱會票購買請走拓元、KKTIX 官方平台。私人轉讓堅持「面交＋掃 QR 確認入場」。"
+    },
+    {
+      "id": "fake_pet_seller",
+      "categoryId": "fake_purchase",
+      "title": "假寵物販售／訂金詐騙",
+      "severity": "MEDIUM",
+      "tags": ["假寵物", "訂金", "犬舍"],
+      "description": "FB／IG「精品犬舍／貓舍」貼出寵物照，要求先匯訂金保留，付款後拒絕看貓狗本舍、最終封鎖。",
+      "redFlags": [
+        "賣家不願現場看貓狗",
+        "強迫使用宅配「先付運費」",
+        "圖片在 Google 反向搜尋有大量重複"
+      ],
+      "protection": "購買寵物請至實體犬舍／貓舍親自看，並要求附晶片號碼及登記文件。"
+    },
+    {
+      "id": "fake_used_car",
+      "categoryId": "fake_purchase",
+      "title": "假二手車訂金詐騙",
+      "severity": "MEDIUM",
+      "tags": ["二手車", "訂金", "假車商"],
+      "description": "8891、FB 假車商低價刊登熱門車款，要求「先付訂金保留」、「我幫你辦過戶」，付款後消失。",
+      "redFlags": [
+        "車價遠低於同款行情",
+        "要求匯款給「業務」個人戶",
+        "推託無法看實車：「車在外地保養廠」"
+      ],
+      "protection": "二手車交易先看實車、查驗證件，過戶款項當面交付或 Escrow。不付訂金。"
+    },
+    {
+      "id": "fake_overseas_buyer",
+      "categoryId": "fake_purchase",
+      "title": "假代購／海外幫購",
+      "severity": "MEDIUM",
+      "tags": ["假代購", "日本", "韓國"],
+      "description": "IG／FB 假代購低價收訂日韓精品、限定商品，收款後封鎖或寄出仿品。",
+      "redFlags": [
+        "價格明顯低於日韓專櫃",
+        "代購要求一次付全款不接受訂金",
+        "代購帳號剛開或追蹤數異常低"
+      ],
+      "protection": "代購選擇有口碑的賣家並走蝦皮／樂天等有買家保護的平台。私下匯款風險自負。"
+    },
+    {
       "id": "social_line_hijack",
       "categoryId": "social_impersonation",
       "title": "LINE／FB 被盜借錢",
@@ -290,9 +643,9 @@
     {
       "id": "social_ceo_fraud",
       "categoryId": "social_impersonation",
-      "title": "假冒老闆／CEO 指示匯款",
+      "title": "假冒老闆／CEO 指示匯款（BEC）",
       "severity": "HIGH",
-      "tags": ["商務電郵詐騙", "BEC"],
+      "tags": ["商務電郵詐騙", "BEC", "假老闆"],
       "description": "公司電郵或通訊軟體出現「老闆」要求財會緊急匯款給「合作廠商」，常見於跨國採購情境。",
       "redFlags": [
         "Email 網域多一個字母或 .co 而非 .com",
@@ -300,6 +653,34 @@
         "收款帳號為境外或新開戶"
       ],
       "protection": "凡涉及金流的指示，務必透過電話或當面 second-channel 雙重確認，不接受純線上的單一指示。"
+    },
+    {
+      "id": "social_official_account",
+      "categoryId": "social_impersonation",
+      "title": "假冒官方小編／粉專客服",
+      "severity": "MEDIUM",
+      "tags": ["假小編", "粉專", "私訊"],
+      "description": "歹徒複製官方粉絲頁名稱與頭像，主動私訊「您中獎」、「您訂單異常」，誘導點假連結填個資。",
+      "redFlags": [
+        "粉專追蹤數很少、剛建立",
+        "頁面網址含奇怪後綴",
+        "私訊聲稱「中獎需確認資料」"
+      ],
+      "protection": "判斷粉專真偽請看是否有藍勾、追蹤數、建立日期。從官方網站再追到 FB 粉專更安全。"
+    },
+    {
+      "id": "social_family_emergency",
+      "categoryId": "social_impersonation",
+      "title": "假家人車禍／醫院急用",
+      "severity": "HIGH",
+      "tags": ["假家人", "車禍", "急救"],
+      "description": "電話聲稱您的子女／父母車禍住院急需手術費，要求立刻匯款至「醫院財務處」。常以老年長輩為目標。",
+      "redFlags": [
+        "電話另一頭哭聲混亂、聽不清楚",
+        "醫院「不能等」、不准你打給家人查證",
+        "要求臨櫃匯款而非到院繳費"
+      ],
+      "protection": "立即掛斷並打給當事人本人確認。台灣醫院急救不會在電話中要求匯款，會請家屬到院處理。"
     },
     {
       "id": "employment_money_mule",
@@ -330,6 +711,48 @@
       "protection": "未正式報到前不需提供個資。如遇可疑公司可至「勞動部勞動力發展署」查詢。"
     },
     {
+      "id": "employment_model",
+      "categoryId": "employment",
+      "title": "假模特兒／網紅試鏡",
+      "severity": "MEDIUM",
+      "tags": ["假模特兒", "試鏡", "個資"],
+      "description": "IG 私訊「您的形象適合我們品牌，邀請試鏡」，要求支付「形象照拍攝費」或提供裸露/半裸照「審核身材」。",
+      "redFlags": [
+        "經紀公司在勞動部查無登記",
+        "要求應徵者「先付」拍攝費",
+        "要求提供私密照"
+      ],
+      "protection": "合法經紀／模特兒公司不會要求應徵者付費，也不會要求私密照。先查驗公司是否合法登記。"
+    },
+    {
+      "id": "employment_typing",
+      "categoryId": "employment",
+      "title": "假打字員／在家手作",
+      "severity": "MEDIUM",
+      "tags": ["假打字員", "手作", "保證金"],
+      "description": "FB 廣告「在家打字一個月 5 萬」、「組裝飾品材料費可退」，要求先繳「保證金」或購買「材料包」。",
+      "redFlags": [
+        "需要先繳保證金／材料費才能開工",
+        "完成後品質永遠「不合格」不發薪",
+        "客服只在 LINE 連繫"
+      ],
+      "protection": "合法工作不會要求員工先付錢。要求繳保證金、買教材的「在家工作」一律拒絕。"
+    },
+    {
+      "id": "employment_delivery_advance",
+      "categoryId": "employment",
+      "title": "假外送員／預付款套利",
+      "severity": "MEDIUM",
+      "tags": ["假外送", "UberEats", "預付"],
+      "description": "歹徒指示「外送員預付餐費再收現金」，提供假地址或先放高額假訂單騙外送員自行墊付。",
+      "redFlags": [
+        "客戶要求外送員「先用自己錢付商家」",
+        "下單地址為偏遠空地或假地址",
+        "客服推託訂單異常"
+      ],
+      "protection": "Uber Eats／foodpanda 外送員不必預付。如遇異常請在 App 內客服回報，切勿用個人錢墊付商家。"
+    },
+    {
       "id": "fake_aid_subsidy",
       "categoryId": "fake_aid",
       "title": "假紓困／補助申請",
@@ -356,6 +779,48 @@
         "獎品來自境外不明單位"
       ],
       "protection": "合法獎項不會要求先匯款。先繳費後領獎一律是詐騙。"
+    },
+    {
+      "id": "fake_aid_youth_dream",
+      "categoryId": "fake_aid",
+      "title": "假青年圓夢／創業補助",
+      "severity": "MEDIUM",
+      "tags": ["青年補助", "創業", "假基金"],
+      "description": "假冒「青年創業基金會」、「文化部補助案」邀請申請數十萬補助，但要求先付「審查費」、「平台手續費」。",
+      "redFlags": [
+        "聯絡單位在政府官網查無對應業務",
+        "要求預付申請費",
+        "保證 100% 過件"
+      ],
+      "protection": "政府青年／創業補助一律免費申請，由原始機關（青輔會、文化部、經濟部中小企業處）受理。"
+    },
+    {
+      "id": "fake_aid_pension",
+      "categoryId": "fake_aid",
+      "title": "假勞退／老人津貼領取",
+      "severity": "MEDIUM",
+      "tags": ["勞退", "老人津貼", "假勞保局"],
+      "description": "電話自稱勞保局／國民年金局，告知「漏領津貼」需配合臨櫃匯款或提供存摺以「補發」。",
+      "redFlags": [
+        "要求口述勞保證號或存摺帳號",
+        "用 LINE 私訊處理而非公文",
+        "強調需立刻配合否則作廢"
+      ],
+      "protection": "勞保／國保補發一律由本人到分行或勞保局臨櫃辦理，不會用電話即時要求。"
+    },
+    {
+      "id": "fake_aid_credit_reward",
+      "categoryId": "fake_aid",
+      "title": "假信用卡紅利兌換",
+      "severity": "MEDIUM",
+      "tags": ["假信用卡", "紅利", "兌換"],
+      "description": "簡訊「您的信用卡紅利點數即將到期」附假連結進入仿冒銀行頁，騙取卡號 + 卡背 3 碼 + OTP。",
+      "redFlags": [
+        "連結網域非該銀行官方",
+        "頁面要求完整卡號 + 安全碼",
+        "強調 24 小時內到期"
+      ],
+      "protection": "紅利兌換請從銀行 App 或官網主動進入。不要從訊息連結點。已輸入請立即掛失信用卡。"
     },
     {
       "id": "sextortion_naked_chat",
@@ -386,32 +851,172 @@
       "protection": "勿匯款、勿回應。保留截圖、撥 165 報案；社群上的私密照片建議鎖定為僅好友可見。"
     },
     {
-      "id": "phishing_streaming",
-      "categoryId": "phishing",
-      "title": "假串流／訂閱續約釣魚",
-      "severity": "MEDIUM",
-      "tags": ["釣魚信", "Netflix", "Apple"],
-      "description": "Email 通知「Netflix／Apple ID／Google 訂閱付款失敗」，附「更新付款」連結進入假網頁。",
+      "id": "sextortion_compensated_dating",
+      "categoryId": "sextortion",
+      "title": "假援交陷阱／仙人跳",
+      "severity": "HIGH",
+      "tags": ["援交", "仙人跳", "勒索"],
+      "description": "FB／Telegram 假帳號招援交，受害者到場後遭多人圍堵、脅迫匯款；或預付「定金」即遭封鎖。",
       "redFlags": [
-        "寄件 Email 網域與官方不同",
-        "信中連結 hover 顯示陌生網域",
-        "頁面要求一次輸入完整卡號、安全碼、生日"
+        "對方堅持先付保證金到陌生帳戶",
+        "見面地點偏遠或特定旅館",
+        "事後出現「家屬／黑道」勒索"
       ],
-      "protection": "請從原 App／官網直接登入查看，不要從信件連結。可於 Apple／Google 帳戶頁查看真實付款狀態。"
+      "protection": "援交本身於台灣違法且高風險。任何要求預付保證金、改變地點的邀約都應視為詐騙陷阱。"
     },
     {
-      "id": "fake_authority_postal",
-      "categoryId": "fake_authority",
-      "title": "假冒郵局／快遞「包裹涉案」",
+      "id": "sextortion_sugar_baby",
+      "categoryId": "sextortion",
+      "title": "假包養／甜心爸爸",
       "severity": "MEDIUM",
-      "tags": ["假郵局", "海關", "假檢警"],
-      "description": "自稱郵局／DHL 通知「包裹內含違禁品涉案」，再「轉接警察」開始監管帳戶劇本。",
+      "tags": ["包養", "甜心", "假富商"],
+      "description": "「sugar daddy」假富商邀請包養，先要求買 iTunes／Google Play 點數「驗證身份」，或誘騙投資。",
       "redFlags": [
-        "要求保密、轉接警局",
-        "對方能說出你的姓名地址",
-        "話術引導你照「警察」指示操作"
+        "要求用點數卡序號「測試信用」",
+        "對方永遠在出差不能見面",
+        "短時間就承諾每月十萬零用金"
       ],
-      "protection": "包裹遞送公司不會以電話告知您涉刑案。掛斷後至中華郵政／DHL／FedEx 官方客服查詢。"
+      "protection": "真實包養關係不會用點數卡測試。任何要求「先給點數證明誠意」的人一律詐騙。"
+    },
+    {
+      "id": "sextortion_porn_membership",
+      "categoryId": "sextortion",
+      "title": "假色情網站「會員紀錄」威脅",
+      "severity": "MEDIUM",
+      "tags": ["假色情站", "威脅信", "比特幣"],
+      "description": "Email 聲稱「我們有您瀏覽成人網站的瀏覽紀錄與攝影機側錄」，限期匯比特幣否則公開。多為亂槍打鳥。",
+      "redFlags": [
+        "Email 內附您舊密碼（多為過去外洩資料）",
+        "要求以比特幣付款",
+        "信件對個資細節含糊"
+      ],
+      "protection": "此類郵件 99% 為亂發勒索，無實際影像。不要回信、不要匯款。檢查所有曾用密碼是否外洩並更換。"
+    },
+    {
+      "id": "gambling_baccarat",
+      "categoryId": "gambling",
+      "title": "百家樂「必殺技／看路法」",
+      "severity": "HIGH",
+      "tags": ["百家樂", "賭博", "假必殺"],
+      "description": "群組老師教「百家樂看路必勝法」，誘導下載境外賭場 App。初期讓你贏一點，加碼後系統操控連輸至負債。",
+      "redFlags": [
+        "宣稱「8 成勝率」、「穩贏不輸」",
+        "賭場 App 來自境外、無實體營運地",
+        "提款被卡「需先洗碼幾倍」"
+      ],
+      "protection": "境外線上賭場在台灣違法且結果可被莊家操控。所謂「必殺技」皆為話術，無任何賭法可長期戰勝莊家。"
+    },
+    {
+      "id": "gambling_lottery_lucky_number",
+      "categoryId": "gambling",
+      "title": "六合彩明牌／包牌",
+      "severity": "MEDIUM",
+      "tags": ["六合彩", "明牌", "簽賭"],
+      "description": "LINE「明牌大師」收取月費／包牌費，宣稱「跟單必中」。多為事後馬後砲、或要求壓注後分潤。",
+      "redFlags": [
+        "宣稱「上週連中三期」但無公開紀錄",
+        "包牌前要先繳「軍師費」",
+        "失準後話術轉嫁「客戶下注時間錯誤」"
+      ],
+      "protection": "六合彩在台灣屬非法賭博。明牌大師的「準度」皆無公開驗證，匯款入會即是受害開始。"
+    },
+    {
+      "id": "gambling_sports_betting",
+      "categoryId": "gambling",
+      "title": "地下運彩／職棒簽賭",
+      "severity": "MEDIUM",
+      "tags": ["地下運彩", "簽賭", "假明牌"],
+      "description": "標榜「賠率比台灣運彩高」、「免抽佣」的地下莊家，輸了被催債、贏了被以「洗碼／封盤」拒絕兌現。",
+      "redFlags": [
+        "客服只在 LINE／Telegram 連繫",
+        "莊家要求預先儲值至錢包帳號",
+        "贏錢後系統「異常」無法提款"
+      ],
+      "protection": "合法運彩請至台灣運彩授權門市。私下簽賭觸法且結算權完全在對方手上。"
+    },
+    {
+      "id": "crypto_wallet_phishing",
+      "categoryId": "crypto_wallet",
+      "title": "假冷錢包簽名授權",
+      "severity": "CRITICAL",
+      "tags": ["MetaMask", "錢包", "授權盜走"],
+      "description": "釣魚網站誘導連結 MetaMask／Trust Wallet，簽下惡意 approve 合約，錢包內所有代幣被一次轉走。",
+      "redFlags": [
+        "錢包跳出未知合約授權請求",
+        "對方提供「免費領空投」連結",
+        "授權金額為 unlimited"
+      ],
+      "protection": "對未知合約一律拒絕簽署。定期至 revoke.cash 取消舊授權，並用獨立冷錢包保存大額資產。"
+    },
+    {
+      "id": "crypto_airdrop_drainer",
+      "categoryId": "crypto_wallet",
+      "title": "假空投／免費領幣陷阱",
+      "severity": "HIGH",
+      "tags": ["空投", "drainer", "假代幣"],
+      "description": "Telegram／X／Discord 推銷「即將上線代幣免費領」，要求連錢包並簽署 transferFrom，餘額瞬間清空。",
+      "redFlags": [
+        "強調「限時 24 小時」、「先簽先領」",
+        "代幣在 CoinGecko／CoinMarketCap 查無",
+        "簽署時錢包出現大額授權警告"
+      ],
+      "protection": "正規空投不會要求預簽 transferFrom／approve。不認識的網站一律不連錢包。"
+    },
+    {
+      "id": "crypto_nft_marketplace",
+      "categoryId": "crypto_wallet",
+      "title": "假 NFT 交易市場",
+      "severity": "MEDIUM",
+      "tags": ["NFT", "假Opensea", "假交易市場"],
+      "description": "仿冒 OpenSea／Magic Eden 等網站，引導買家上架或競標假 NFT，付款後資產被導入歹徒錢包。",
+      "redFlags": [
+        "網域非 opensea.io 等官方主網域",
+        "頁面要求高額 gas 費或上架費",
+        "競標後 NFT 馬上被轉走"
+      ],
+      "protection": "操作 NFT 請從書籤直接進入官方網域。任何「免費鑄造」的合約都先去 Etherscan 看程式碼。"
+    },
+    {
+      "id": "tech_support_microsoft",
+      "categoryId": "tech_support",
+      "title": "假微軟客服遠端控制",
+      "severity": "HIGH",
+      "tags": ["假微軟", "遠端", "AnyDesk"],
+      "description": "電腦突然彈出「Windows 中毒、撥打 0800-xxx」假警報，誘導下載 AnyDesk／TeamViewer 由「客服」遠端「修復」，實則竊取網銀資料。",
+      "redFlags": [
+        "瀏覽器彈窗有警示音、要求撥打電話",
+        "客服要求安裝遠端控制軟體",
+        "操作中要求登入網銀「驗證」"
+      ],
+      "protection": "微軟／Apple 不會主動電話客服。遇到彈窗請強制關閉瀏覽器並重開機，切勿撥打畫面上的電話。"
+    },
+    {
+      "id": "tech_support_apple",
+      "categoryId": "tech_support",
+      "title": "假 Apple 客服 iCloud 鎖定",
+      "severity": "HIGH",
+      "tags": ["假Apple", "iCloud", "尋找iPhone"],
+      "description": "歹徒取得受害者 Apple ID 後遠端鎖定裝置，再以「Apple 客服」名義要求支付贖金或購買 Apple 點數解鎖。",
+      "redFlags": [
+        "iPhone 突然顯示鎖機畫面與聯絡訊息",
+        "對方要求 iTunes 點數卡或 USDT 解鎖",
+        "「客服」LINE 處理而非官方"
+      ],
+      "protection": "立即至 appleid.apple.com 重設密碼並啟用雙因素，可向 Apple 官方支援開案。不要付贖金。"
+    },
+    {
+      "id": "tech_support_router",
+      "categoryId": "tech_support",
+      "title": "假家用路由器安全警告",
+      "severity": "MEDIUM",
+      "tags": ["假路由器", "中華電信", "假客服"],
+      "description": "電話自稱中華電信／網路服務商，告知您家網路被「駭客入侵」，需配合操作路由器設定（實為改 DNS 至釣魚伺服器）。",
+      "redFlags": [
+        "要求口述路由器後台密碼",
+        "指示連線到陌生網址下載「修復工具」",
+        "強調「不修明天就沒網路」"
+      ],
+      "protection": "中華電信故障處理請撥 123 確認。任何要求改路由器設定的電話一律掛斷。"
     }
   ]
 }

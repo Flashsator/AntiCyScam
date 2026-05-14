@@ -1,6 +1,7 @@
 package com.anticyscam.app.ui.mainfunction
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -20,11 +22,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.anticyscam.app.R
 import com.anticyscam.app.domain.model.TransferAccount
 import com.anticyscam.app.ui.theme.AlertYellow
+import com.anticyscam.app.ui.theme.SuccessGreen
 import com.anticyscam.app.ui.theme.SurfaceDim
 import com.anticyscam.app.ui.theme.TextDisabled
 import com.anticyscam.app.ui.theme.TextPrimary
@@ -35,25 +39,34 @@ import com.anticyscam.app.ui.theme.WarningRedDark
 /**
  * Single transfer-account row.
  *
- * - 預設 "臨時用" 顯示為黃色星星，不可刪除，點擊時直接放行（不複製帳號）
- * - 一般帳號顯示為紅框，點擊複製帳號至剪貼簿
+ * Status-driven styling (PRD § 3.1):
+ *   - Default 臨時用 — yellow star, no delete, no copy on tap.
+ *   - 🟢 Normal      — red border, copies on tap.
+ *   - 🟡 InCooldown  — yellow border + countdown badge, treated as 臨時用.
+ *   - 💤 Dormant     — gray border + dormant badge, requires confirmation.
  */
 @Composable
 fun TransferAccountCard(
     account: TransferAccount,
+    status: TransferAccount.Status,
     onClick: (TransferAccount) -> Unit,
     onDelete: (TransferAccount) -> Unit,
     modifier: Modifier = Modifier,
-    showDelete: Boolean = true
+    showDelete: Boolean = true,
+    onEdit: ((TransferAccount) -> Unit)? = null
 ) {
+    val accentColor = when (status) {
+        TransferAccount.Status.Default -> AlertYellow
+        TransferAccount.Status.Normal -> WarningRed
+        is TransferAccount.Status.InCooldown -> AlertYellow
+        TransferAccount.Status.Dormant -> TextDisabled
+    }
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceDim),
-        border = BorderStroke(
-            width = if (account.isDefault) 1.5.dp else 2.dp,
-            color = if (account.isDefault) AlertYellow else WarningRed
-        ),
+        border = BorderStroke(width = 2.dp, color = accentColor),
         onClick = { onClick(account) }
     ) {
         Row(
@@ -69,44 +82,89 @@ fun TransferAccountCard(
                     tint = AlertYellow,
                     modifier = Modifier.padding(end = 12.dp)
                 )
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
                 Text(
-                    text = if (account.isDefault) {
-                        "${stringResource(R.string.transfer_field_name)}：${account.name}"
-                    } else {
-                        "${stringResource(R.string.transfer_field_name)}：${account.name}"
-                    },
+                    text = stringResource(R.string.transfer_default_purpose),
                     color = TextPrimary,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
                 )
-                Text(
-                    text = if (account.isDefault) {
-                        stringResource(R.string.transfer_default_purpose)
-                    } else {
-                        "${stringResource(R.string.transfer_field_account)}：${maskAccount(account.accountNumber)}"
-                    },
-                    color = if (account.isDefault) TextDisabled else TextSecondary,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-            if (!account.isDefault && showDelete) {
-                IconButton(onClick = { onDelete(account) }) {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
-                        contentDescription = "刪除",
-                        tint = WarningRedDark
-                    )
-                }
             } else {
-                Box(modifier = Modifier) // keep row height stable
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "${stringResource(R.string.transfer_field_name)}：${account.name}",
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "${stringResource(R.string.transfer_field_account)}：${maskAccount(account.accountNumber)}",
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    StatusBadge(status = status)
+                }
+                if (onEdit != null && account.editsRemaining > 0) {
+                    IconButton(onClick = { onEdit(account) }) {
+                        Icon(
+                            imageVector = Icons.Filled.Edit,
+                            contentDescription = "編輯",
+                            tint = AlertYellow
+                        )
+                    }
+                }
+                if (showDelete) {
+                    IconButton(onClick = { onDelete(account) }) {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = "刪除",
+                            tint = WarningRedDark
+                        )
+                    }
+                }
             }
         }
     }
 }
+
+@Composable
+private fun StatusBadge(status: TransferAccount.Status) {
+    val (label, fg, bg) = when (status) {
+        TransferAccount.Status.Default ->
+            Triple(stringResource(R.string.account_status_default), AlertYellow, SurfaceDim)
+        TransferAccount.Status.Normal ->
+            Triple(stringResource(R.string.account_status_normal), SuccessGreen, SurfaceDim)
+        is TransferAccount.Status.InCooldown ->
+            Triple(cooldownLabel(status), AlertYellow, SurfaceDim)
+        TransferAccount.Status.Dormant ->
+            Triple(stringResource(R.string.account_status_dormant), TextDisabled, SurfaceDim)
+    }
+    Box(
+        modifier = Modifier
+            .background(bg, RoundedCornerShape(6.dp))
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = label,
+            color = fg,
+            style = MaterialTheme.typography.labelSmall
+        )
+    }
+}
+
+@Composable
+private fun cooldownLabel(status: TransferAccount.Status.InCooldown): String {
+    val hours = (status.remainingMs / (60L * 60 * 1000)).coerceAtLeast(0)
+    val mins = ((status.remainingMs / (60L * 1000)) % 60).coerceAtLeast(0)
+    val timeLabel = if (hours > 0) "${hours}h" else "${mins}m"
+    return stringResource(R.string.account_status_cooldown) +
+        " · " +
+        stringResource(R.string.account_cooldown_remaining, timeLabel)
+}
+
+@Suppress("unused")
+private fun unusedColorRef(): Color = Color.Transparent
 
 /**
  * Show first 4 and last 4 digits to discourage shoulder-surfing while still

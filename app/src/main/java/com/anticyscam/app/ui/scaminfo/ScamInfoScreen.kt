@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Call
@@ -104,15 +105,7 @@ fun ScamInfoScreen(
         }
 
         item {
-            SectionTitle("緊急通報管道")
-        }
-        items(items = state.channels, key = { it.id }) { channel ->
-            ChannelCard(channel) { openChannel(context, channel) }
-        }
-
-        item { Spacer(Modifier.height(4.dp)) }
-        item {
-            SectionTitle("常見手法（${state.allTactics.size} 種）")
+            SectionTitle("台灣詐騙手法（${state.allTactics.size} 種）")
         }
         item {
             SearchBar(
@@ -139,6 +132,14 @@ fun ScamInfoScreen(
                     onToggle = { viewModel.onTacticExpanded(tactic.id) }
                 )
             }
+        }
+
+        item { Spacer(Modifier.height(4.dp)) }
+        item {
+            SectionTitle("緊急通報管道")
+        }
+        items(items = state.channels, key = { it.id }) { channel ->
+            ChannelCard(channel) { openChannel(context, channel) }
         }
 
         item { FooterDisclaimer(state.notice, state.source) }
@@ -285,21 +286,43 @@ private fun CategoryChips(
     selected: String?,
     onSelected: (String?) -> Unit
 ) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        item {
-            FilterChip(
-                selected = selected == null,
-                onClick = { onSelected(null) },
-                label = { Text("全部") },
-                colors = chipColors()
-            )
+    // Phase L1: phone testing showed users didn't realise more categories sit
+    // off-screen. Overlay a chevron at the right edge as a swipe affordance,
+    // and pad the LazyRow's trailing edge so the last chip isn't hidden under
+    // the chevron pill.
+    Box(modifier = Modifier.fillMaxWidth()) {
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(end = 32.dp)
+        ) {
+            item {
+                FilterChip(
+                    selected = selected == null,
+                    onClick = { onSelected(null) },
+                    label = { Text("全部") },
+                    colors = chipColors()
+                )
+            }
+            items(items = categories, key = { it.id }) { category ->
+                FilterChip(
+                    selected = selected == category.id,
+                    onClick = { onSelected(if (selected == category.id) null else category.id) },
+                    label = { Text(category.displayName) },
+                    colors = chipColors()
+                )
+            }
         }
-        items(items = categories, key = { it.id }) { category ->
-            FilterChip(
-                selected = selected == category.id,
-                onClick = { onSelected(if (selected == category.id) null else category.id) },
-                label = { Text(category.displayName) },
-                colors = chipColors()
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .background(SurfaceBlack.copy(alpha = 0.85f), CircleShape)
+                .padding(2.dp)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = "向右滑動查看更多分類",
+                tint = TextSecondary,
+                modifier = Modifier.size(18.dp)
             )
         }
     }

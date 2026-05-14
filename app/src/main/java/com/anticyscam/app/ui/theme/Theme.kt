@@ -15,7 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-// 反詐器主題：紅黑警示為主，刻意不跟隨 Material You 動態色，
+// 防詐器主題：紅黑警示為主，刻意不跟隨 Material You 動態色，
 // 確保不同裝置上警示視覺一致。
 private val AntiScamDarkColors = darkColorScheme(
     primary = WarningRed,

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,7 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -29,6 +30,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -42,8 +44,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.anticyscam.app.R
+import com.anticyscam.app.domain.model.BoundApp
 import com.anticyscam.app.domain.model.TransferAccount
+import com.anticyscam.app.ui.dormant.DormantVerifyActivity
+import com.anticyscam.app.ui.gate.AccessibilityGateScreen
+import com.anticyscam.app.ui.gate.AccessibilityGateViewModel
+import com.anticyscam.app.ui.lockdown.DailyAddLockActivity
+import com.anticyscam.app.ui.tempuse.TempUseGateActivity
 import com.anticyscam.app.ui.theme.SurfaceBlack
 import com.anticyscam.app.ui.theme.TextPrimary
 import com.anticyscam.app.ui.theme.WarningRed
@@ -51,23 +62,48 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * 反詐器主畫面。
+ * 防詐器主畫面。
  *
- * 兩段式啟動流程（Phase 6）：
+ * 兩段式啟動流程（Phase 6 + PRD § 3.3 / 3.4）：
  *  1. 使用者點擊某個綁定 App → ViewModel 設定 pendingApp → 顯示
  *     [TransferAccountPickerSheet]
- *  2. 使用者在 sheet 中點擊一筆帳號：
- *       - 一般帳號：複製帳號號碼到剪貼簿
- *       - 「臨時用」：不複製
- *       兩者皆會：呼叫 AuthorizedLaunchTracker.authorize() 並 startActivity
+ *  2. 使用者在 sheet 中點擊一筆帳號 → 依該帳號的 [TransferAccount.Status] 分流：
+ *       - Default / InCooldown → 啟動 [TempUseGateActivity] 走三階段警告
+ *       - Dormant              → 啟動 [DormantVerifyActivity] 一次性確認
+ *       - Normal               → 複製帳號 + 直接 launchAuthorized
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
+    // Requirement #3 (revised): the 防詐器 tab is locked behind a three-way
+    // gate (a11y + device admin + notifications). The other tabs (詐騙專區,
+    // 設定) are unaffected and continue to render normally. When any of the
+    // three requirements is missing, render the inline gate instead of the
+    // transfer-account workflow below.
+    val gateViewModel: AccessibilityGateViewModel = hiltViewModel()
+    val gateState by gateViewModel.state.collectAsState()
+    // 此 hiltViewModel() 是 NavBackStackEntry-scoped，跟 MainActivity 的
+    // gateViewModel 不是同一個 instance — Activity.onResume 刷不到這裡。
+    // 自己掛 lifecycle observer，每次回到前景就 refresh 一次，使用者從系統
+    // 設定回 App 才能即時看到「已啟用」。
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) gateViewModel.refresh()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    if (!gateState.allRequirementsMet) {
+        AccessibilityGateScreen(state = gateState)
+        return
+    }
+
     val transferViewModel: TransferAccountViewModel = hiltViewModel()
     val mainViewModel: MainFunctionViewModel = hiltViewModel()
-    val accounts by transferViewModel.accounts.collectAsState()
+    val uiList by transferViewModel.uiList.collectAsState()
     val addResult by transferViewModel.addResult.collectAsState()
+    val dailyState by transferViewModel.dailyState.collectAsState()
     val boundApps by mainViewModel.boundApps.collectAsState()
     val pendingApp by mainViewModel.pendingApp.collectAsState()
 
@@ -75,16 +111,20 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingAccount by remember { mutableStateOf<TransferAccount?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val copiedMsg = stringResource(R.string.transfer_copied)
     val limitMsg = stringResource(R.string.transfer_max_reached)
     val notInstalledMsg = "目標 App 已被解除安裝"
+    val editsExhaustedMsg = stringResource(R.string.transfer_edits_exhausted_toast)
+    val dailyLockedTemplate = stringResource(R.string.daily_add_locked_remaining)
 
     LaunchedEffect(addResult) {
-        when (addResult) {
+        when (val r = addResult) {
             is TransferAccountViewModel.AddOutcome.Success -> {
                 showAddDialog = false
+                editingAccount = null
                 transferViewModel.consumeAddResult()
             }
             TransferAccountViewModel.AddOutcome.LimitReached -> {
@@ -94,22 +134,32 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
             TransferAccountViewModel.AddOutcome.InvalidInput -> {
                 transferViewModel.consumeAddResult()
             }
+            is TransferAccountViewModel.AddOutcome.DailyLimitTriggered -> {
+                showAddDialog = false
+                editingAccount = null
+                context.startActivity(DailyAddLockActivity.newIntent(context))
+                transferViewModel.consumeAddResult()
+            }
+            is TransferAccountViewModel.AddOutcome.DailyLocked -> {
+                showAddDialog = false
+                editingAccount = null
+                snackbarHostState.showSnackbar(
+                    String.format(dailyLockedTemplate, formatRemaining(r.remainingMs))
+                )
+                transferViewModel.consumeAddResult()
+            }
+            TransferAccountViewModel.AddOutcome.EditsExhausted -> {
+                editingAccount = null
+                snackbarHostState.showSnackbar(editsExhaustedMsg)
+                transferViewModel.consumeAddResult()
+            }
             TransferAccountViewModel.AddOutcome.Idle -> Unit
         }
     }
 
     Scaffold(
         containerColor = SurfaceBlack,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = WarningRed,
-                contentColor = TextPrimary
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = "新增轉帳帳號")
-            }
-        }
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { inner ->
         Column(
             modifier = Modifier
@@ -136,17 +186,39 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
                 onAppClick = mainViewModel::onBoundAppClicked
             )
 
-            Text(
-                text = "轉帳帳號",
-                color = TextPrimary,
-                style = MaterialTheme.typography.titleMedium
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "轉帳帳號",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                FilledTonalButton(
+                    onClick = { showAddDialog = true },
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = WarningRed,
+                        contentColor = TextPrimary
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 4.dp)
+                    )
+                    Text("新增", style = MaterialTheme.typography.labelLarge)
+                }
+            }
             TransferAccountList(
-                accounts = accounts,
+                items = uiList,
                 onAccountClick = { account ->
                     handleStandaloneCopy(context, account, snackbarHostState, scope, copiedMsg)
                 },
-                onAccountDelete = transferViewModel::delete
+                onAccountDelete = transferViewModel::delete,
+                onAccountEdit = { account -> editingAccount = account }
             )
         }
     }
@@ -154,12 +226,13 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
     pendingApp?.let { app ->
         TransferAccountPickerSheet(
             pendingApp = app,
-            accounts = accounts,
+            items = uiList,
             sheetState = sheetState,
-            onAccountSelected = { account ->
-                handleAuthorizedLaunch(
+            onAccountSelected = { accountUi ->
+                handlePickerSelection(
                     context = context,
-                    account = account,
+                    accountUi = accountUi,
+                    app = app,
                     viewModel = mainViewModel,
                     snackbarHostState = snackbarHostState,
                     scope = scope,
@@ -174,7 +247,20 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
     if (showAddDialog) {
         AddTransferAccountDialog(
             onDismiss = { showAddDialog = false },
-            onConfirm = { name, number -> transferViewModel.addAccount(name, number) }
+            onConfirm = { name, number -> transferViewModel.addAccount(name, number) },
+            showSecondAddWarning = dailyState.countToday >= 2
+        )
+    }
+
+    editingAccount?.let { account ->
+        AddTransferAccountDialog(
+            onDismiss = { editingAccount = null },
+            onConfirm = { name, number ->
+                transferViewModel.editAccount(account.id, name, number)
+            },
+            isEditMode = true,
+            initialName = account.name,
+            initialAccountNumber = account.accountNumber
         )
     }
 }
@@ -202,23 +288,26 @@ private fun BindAppsButton(onClick: () -> Unit) {
 
 @Composable
 private fun TransferAccountList(
-    accounts: List<TransferAccount>,
+    items: List<TransferAccountViewModel.AccountUi>,
     onAccountClick: (TransferAccount) -> Unit,
-    onAccountDelete: (Long) -> Unit
+    onAccountDelete: (Long) -> Unit,
+    onAccountEdit: (TransferAccount) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(bottom = 96.dp),
+        contentPadding = PaddingValues(bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items(items = accounts, key = { it.id }) { account ->
+        items(items = items, key = { it.account.id }) { ui ->
             TransferAccountCard(
-                account = account,
+                account = ui.account,
+                status = ui.status,
                 onClick = onAccountClick,
-                onDelete = { onAccountDelete(it.id) }
+                onDelete = { onAccountDelete(it.id) },
+                onEdit = onAccountEdit
             )
         }
-        if (accounts.isEmpty()) {
+        if (items.isEmpty()) {
             items(1) {
                 Box(
                     modifier = Modifier
@@ -254,27 +343,63 @@ private fun handleStandaloneCopy(
 }
 
 /**
- * 授權啟動模式 — 從 picker sheet 點擊帳號：複製（若非預設）+ launch。
+ * 從 picker sheet 點擊帳號：依 status 決定走哪條路。Stage gating / dormant
+ * 確認都由各自的 Activity 內部負責 consume + launch；Normal 帳號才走原本
+ * 「直接 copy + launchAuthorized」的快路徑。
  */
-private fun handleAuthorizedLaunch(
+private fun handlePickerSelection(
     context: Context,
-    account: TransferAccount,
+    accountUi: TransferAccountViewModel.AccountUi,
+    app: BoundApp,
     viewModel: MainFunctionViewModel,
     snackbarHostState: SnackbarHostState,
     scope: CoroutineScope,
     copiedMsg: String,
     notInstalledMsg: String
 ) {
-    if (!account.isDefault) {
-        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        cm.setPrimaryClip(ClipData.newPlainText("transfer_account", account.accountNumber))
-        scope.launch { snackbarHostState.showSnackbar(copiedMsg) }
-    }
-    when (viewModel.authorizeAndLaunch()) {
-        is MainFunctionViewModel.LaunchOutcome.NotInstalled -> {
-            scope.launch { snackbarHostState.showSnackbar(notInstalledMsg) }
+    val account = accountUi.account
+    when (accountUi.status) {
+        TransferAccount.Status.Default,
+        is TransferAccount.Status.InCooldown -> {
+            viewModel.cancelPending()
+            context.startActivity(
+                TempUseGateActivity.newIntent(
+                    context = context,
+                    targetPackage = app.packageName,
+                    accountId = if (account.isDefault) null else account.id,
+                    accountNumber = if (account.isDefault) "" else account.accountNumber
+                )
+            )
         }
-        is MainFunctionViewModel.LaunchOutcome.Launched -> Unit
-        MainFunctionViewModel.LaunchOutcome.NoPending -> Unit
+        TransferAccount.Status.Dormant -> {
+            viewModel.cancelPending()
+            context.startActivity(
+                DormantVerifyActivity.newIntent(
+                    context = context,
+                    accountId = account.id,
+                    targetPackage = app.packageName,
+                    accountNumber = account.accountNumber
+                )
+            )
+        }
+        TransferAccount.Status.Normal -> {
+            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText("transfer_account", account.accountNumber))
+            scope.launch { snackbarHostState.showSnackbar(copiedMsg) }
+            when (viewModel.authorizeAndLaunch()) {
+                is MainFunctionViewModel.LaunchOutcome.NotInstalled -> {
+                    scope.launch { snackbarHostState.showSnackbar(notInstalledMsg) }
+                }
+                is MainFunctionViewModel.LaunchOutcome.Launched -> Unit
+                MainFunctionViewModel.LaunchOutcome.NoPending -> Unit
+            }
+        }
     }
+}
+
+private fun formatRemaining(ms: Long): String {
+    val totalMin = (ms / 60_000L).coerceAtLeast(0L)
+    val h = totalMin / 60
+    val m = totalMin % 60
+    return if (h > 0) "${h}h${m}m" else "${m}m"
 }

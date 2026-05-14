@@ -38,7 +38,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -47,6 +47,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.DisposableEffect
 import com.anticyscam.app.BuildConfig
 import com.anticyscam.app.R
+import com.anticyscam.app.service.ForegroundAppGuard
 import com.anticyscam.app.ui.theme.AlertYellow
 import com.anticyscam.app.ui.theme.DividerGray
 import com.anticyscam.app.ui.theme.SuccessGreen
@@ -55,11 +56,13 @@ import com.anticyscam.app.ui.theme.SurfaceDim
 import com.anticyscam.app.ui.theme.TextPrimary
 import com.anticyscam.app.ui.theme.TextSecondary
 import com.anticyscam.app.ui.theme.WarningRed
-import com.anticyscam.app.utils.AccessibilityChecker
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
- * 設定頁 — 顯示反詐器目前狀態與資料管理。
+ * 設定頁 — 顯示防詐器目前狀態與資料管理。
  *
  * 區塊：
  *  1. 無障礙服務狀態（onResume 重新檢查；未啟用時提供前往系統設定的按鈕）
@@ -72,6 +75,8 @@ import kotlinx.coroutines.launch
 fun SettingScreen() {
     val viewModel: SettingViewModel = hiltViewModel()
     val status by viewModel.status.collectAsState()
+    val diagnostic by viewModel.diagnostic.collectAsState()
+    val serviceAlive by viewModel.accessibilityServiceAlive.collectAsState()
     val pendingClear by viewModel.pendingClear.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -107,11 +112,27 @@ fun SettingScreen() {
                 )
             }
             item {
-                AccessibilityStatusCard(
-                    enabled = status.accessibilityEnabled,
-                    onOpenSettings = {
-                        context.startActivity(AccessibilityChecker.openSettingsIntent())
-                    }
+                ProtectionStatusCard(
+                    a11yEnabled = status.accessibilityEnabled,
+                    deviceAdminActive = status.deviceAdminActive,
+                    notificationsEnabled = status.notificationsEnabled,
+                    batteryIgnored = status.batteryOptimizationIgnored,
+                    onOpenA11y = viewModel::openAccessibilitySettings,
+                    onOpenDeviceAdmin = viewModel::openDeviceAdminSettings,
+                    onOpenNotifications = viewModel::openNotificationSettings,
+                    onOpenBattery = viewModel::requestBatteryExemption
+                )
+            }
+            item {
+                DiagnosticCard(
+                    serviceAlive = serviceAlive,
+                    accessibilityEnabled = status.accessibilityEnabled,
+                    batteryIgnored = status.batteryOptimizationIgnored,
+                    overlayGranted = status.overlayPermissionGranted,
+                    diagnostic = diagnostic,
+                    onRequestBattery = viewModel::requestBatteryExemption,
+                    onRequestOverlay = viewModel::requestOverlayPermission,
+                    onFireTestWarning = viewModel::fireTestWarning
                 )
             }
             item {
@@ -145,14 +166,18 @@ fun SettingScreen() {
 }
 
 @Composable
-private fun AccessibilityStatusCard(enabled: Boolean, onOpenSettings: () -> Unit) {
-    val borderColor = if (enabled) SuccessGreen else WarningRed
-    val icon = if (enabled) Icons.Filled.CheckCircle else Icons.Filled.Warning
-    val statusText = if (enabled) {
-        stringResource(R.string.gate_status_enabled)
-    } else {
-        stringResource(R.string.gate_status_disabled)
-    }
+private fun ProtectionStatusCard(
+    a11yEnabled: Boolean,
+    deviceAdminActive: Boolean,
+    notificationsEnabled: Boolean,
+    batteryIgnored: Boolean,
+    onOpenA11y: () -> Unit,
+    onOpenDeviceAdmin: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    onOpenBattery: () -> Unit
+) {
+    val allOn = a11yEnabled && deviceAdminActive && notificationsEnabled && batteryIgnored
+    val borderColor = if (allOn) SuccessGreen else AlertYellow
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -167,28 +192,88 @@ private fun AccessibilityStatusCard(enabled: Boolean, onOpenSettings: () -> Unit
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(imageVector = icon, contentDescription = null, tint = borderColor)
+                Icon(
+                    imageVector = if (allOn) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                    contentDescription = null,
+                    tint = borderColor
+                )
                 Text(
-                    text = "無障礙服務",
+                    text = "防詐器保護狀態",
                     color = TextPrimary,
                     style = MaterialTheme.typography.titleMedium
                 )
             }
             Text(
-                text = "目前狀態：$statusText",
+                text = if (allOn) {
+                    "四項保護全部已啟用，防詐器正在守護您的轉帳安全。"
+                } else {
+                    "下方未啟用的項目，請點「前往啟用」開啟。"
+                },
                 color = TextSecondary,
+                style = MaterialTheme.typography.bodySmall
+            )
+            ProtectionFeatureRow(
+                label = stringResource(R.string.gate_item_a11y),
+                enabled = a11yEnabled,
+                onOpen = onOpenA11y
+            )
+            ProtectionFeatureRow(
+                label = stringResource(R.string.gate_item_admin),
+                enabled = deviceAdminActive,
+                onOpen = onOpenDeviceAdmin
+            )
+            ProtectionFeatureRow(
+                label = stringResource(R.string.gate_item_notify),
+                enabled = notificationsEnabled,
+                onOpen = onOpenNotifications
+            )
+            ProtectionFeatureRow(
+                label = stringResource(R.string.gate_item_battery),
+                enabled = batteryIgnored,
+                onOpen = onOpenBattery
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProtectionFeatureRow(
+    label: String,
+    enabled: Boolean,
+    onOpen: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = if (enabled) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                contentDescription = null,
+                tint = if (enabled) SuccessGreen else WarningRed
+            )
+            Text(
+                text = label,
+                color = TextPrimary,
                 style = MaterialTheme.typography.bodyMedium
             )
-            if (!enabled) {
-                OutlinedButton(
-                    onClick = onOpenSettings,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, WarningRed),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = WarningRed)
-                ) {
-                    Text(text = stringResource(R.string.gate_open_settings))
-                }
+        }
+        if (enabled) {
+            Text(
+                text = stringResource(R.string.gate_status_on),
+                color = SuccessGreen,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        } else {
+            TextButton(onClick = onOpen) {
+                Text(
+                    text = stringResource(R.string.gate_action_enable),
+                    color = WarningRed
+                )
             }
         }
     }
@@ -373,6 +458,144 @@ private fun ClearConfirmDialog(onCancel: () -> Unit, onConfirm: () -> Unit) {
         }
     )
 }
+
+@Composable
+private fun DiagnosticCard(
+    serviceAlive: Boolean,
+    accessibilityEnabled: Boolean,
+    batteryIgnored: Boolean,
+    overlayGranted: Boolean,
+    diagnostic: ForegroundAppGuard.Diagnostic,
+    onRequestBattery: () -> Unit,
+    onRequestOverlay: () -> Unit,
+    onFireTestWarning: () -> Unit
+) {
+    val allHealthy = serviceAlive && accessibilityEnabled && batteryIgnored && overlayGranted
+    val borderColor = if (allHealthy) SuccessGreen else AlertYellow
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDim),
+        border = BorderStroke(1.dp, borderColor)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "診斷資訊",
+                color = TextPrimary,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = "若綁定 App 直開時沒跳警告，請依照以下狀態逐項排除：",
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodySmall
+            )
+            StatusRow(
+                label = "服務心跳",
+                ok = serviceAlive,
+                okText = "已連線",
+                failText = "尚未連線"
+            )
+            StatusRow(
+                label = "無障礙啟用清單",
+                ok = accessibilityEnabled,
+                okText = "已加入",
+                failText = "未加入"
+            )
+            StatusRow(
+                label = "電池白名單",
+                ok = batteryIgnored,
+                okText = "已加入",
+                failText = "未加入",
+                onAction = if (!batteryIgnored) onRequestBattery else null,
+                actionText = "請求"
+            )
+            StatusRow(
+                label = "覆蓋層權限",
+                ok = overlayGranted,
+                okText = "已授權",
+                failText = "未授權",
+                onAction = if (!overlayGranted) onRequestOverlay else null,
+                actionText = "請求"
+            )
+            StatsRow(
+                label = "最近偵測前景",
+                value = diagnostic.lastForegroundPackage ?: "—"
+            )
+            StatsRow(
+                label = "最近偵測時間",
+                value = diagnostic.lastEventEpochMs?.let { formatClockTime(it) } ?: "—"
+            )
+            StatsRow(
+                label = "最近判決",
+                value = diagnostic.lastDecisionLabel ?: "—"
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "事件數",
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = "總${diagnostic.totalEvents} / 忽${diagnostic.ignoredCount} / " +
+                        "通${diagnostic.allowedCount} / 擋${diagnostic.blockedCount}",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            OutlinedButton(
+                onClick = onFireTestWarning,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, AlertYellow),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = AlertYellow)
+            ) {
+                Text(text = "測試警告畫面")
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusRow(
+    label: String,
+    ok: Boolean,
+    okText: String,
+    failText: String,
+    onAction: (() -> Unit)? = null,
+    actionText: String? = null
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = label, color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = if (ok) okText else failText,
+                color = if (ok) SuccessGreen else WarningRed,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            if (!ok && onAction != null && actionText != null) {
+                TextButton(onClick = onAction) {
+                    Text(text = actionText, color = AlertYellow)
+                }
+            }
+        }
+    }
+}
+
+private val clockTimeFormatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+private fun formatClockTime(epochMs: Long): String = clockTimeFormatter.format(Date(epochMs))
 
 private fun dial165(context: android.content.Context) {
     val intent = Intent(Intent.ACTION_DIAL).apply {

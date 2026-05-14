@@ -13,12 +13,19 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Drives the accessibility gate. The gate cannot be passed unless the system
- * reports our accessibility service as enabled.
+ * Drives the four-requirement gate that protects the 防詐器 tab.
  *
- * State is recomputed on every [refresh] call. MainActivity drives this from
- * onResume so that returning from the system Accessibility settings page
- * immediately reflects the new state.
+ * Four requirements must hold simultaneously before the tab unlocks AND the
+ * "防詐器保護中" foreground notification is allowed to appear:
+ *   1. Accessibility service enabled
+ *   2. Device admin active (prevents accidental uninstall)
+ *   3. App-level notifications enabled (so the ongoing notification can show)
+ *   4. Battery optimization ignored — without this, doze/standby on Android 12+
+ *      and OEM aggressive kill silently terminate the a11y monitor in背景。
+ *
+ * State is recomputed on every [refresh] call. Callers drive this from
+ * `onResume` so returning from the relevant system Settings page immediately
+ * reflects the new state.
  */
 @HiltViewModel
 class AccessibilityGateViewModel @Inject constructor(
@@ -34,12 +41,19 @@ class AccessibilityGateViewModel @Inject constructor(
     }
 
     fun refresh() {
-        val enabled = AccessibilityChecker.isOurServiceEnabled(getApplication())
-        _state.value = _state.value.copy(
-            isServiceEnabled = enabled,
+        val ctx = getApplication<Application>()
+        val a11y = AccessibilityChecker.isOurServiceEnabled(ctx)
+        val admin = AccessibilityChecker.isDeviceAdminActive(ctx)
+        val notify = AccessibilityChecker.isNotificationsEnabled(ctx)
+        val battery = AccessibilityChecker.isBatteryOptimizationIgnored(ctx)
+        _state.value = GateUiState(
+            isServiceEnabled = a11y,
+            isDeviceAdminActive = admin,
+            isNotificationsEnabled = notify,
+            isBatteryUnrestricted = battery,
             hasCheckedOnce = true
         )
-        if (enabled) {
+        if (a11y) {
             viewModelScope.launch {
                 preferences.markFirstLaunchComplete()
             }
@@ -49,6 +63,15 @@ class AccessibilityGateViewModel @Inject constructor(
 
 data class GateUiState(
     val isServiceEnabled: Boolean = false,
+    val isDeviceAdminActive: Boolean = false,
+    val isNotificationsEnabled: Boolean = false,
+    val isBatteryUnrestricted: Boolean = false,
     /** First check has happened — used to avoid flashing wrong state on launch. */
     val hasCheckedOnce: Boolean = false
-)
+) {
+    val allRequirementsMet: Boolean
+        get() = isServiceEnabled &&
+            isDeviceAdminActive &&
+            isNotificationsEnabled &&
+            isBatteryUnrestricted
+}
