@@ -177,9 +177,6 @@ class TempUseGateViewModel @Inject constructor(
             val cm = activityContext.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
             cm?.setPrimaryClip(ClipData.newPlainText("transfer_account", accountNumber))
         }
-        accountId?.let { id ->
-            viewModelScope.launch { transferRepo.markUsed(id) }
-        }
         targetPackage?.let { pkg -> appLauncher.launchAuthorized(pkg) }
     }
 

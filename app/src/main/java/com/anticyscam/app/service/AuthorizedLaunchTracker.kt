@@ -17,8 +17,15 @@ import javax.inject.Singleton
  *  - Uses [SystemClock.elapsedRealtime] (monotonic) — wall-clock changes
  *    cannot bypass the gate.
  *  - The grant is single-use within its window: [consumeAuthorization]
- *    clears the entry on first hit, so backgrounding-then-relaunching
- *    the app (e.g. from recents) still triggers the warning.
+ *    clears the entry on first hit. Once consumed, [ForegroundAppGuard]
+ *    upgrades the package to a session-level grant (cleared only when the
+ *    user truly switches to a different non-system app), so transient
+ *    system-UI overlays / IME / OTP toasts during a bank session no
+ *    longer demand a fresh authorization.
+ *  - The window only needs to cover the gap between tapping launch and
+ *    the OS surfacing the bound app's first WINDOW_STATE_CHANGED — i.e.
+ *    cold start + biometric unlock + first foreground event. 5 minutes
+ *    is generous; the session model takes over after that.
  *  - Thread-safe — accessed from Activity (UI thread) and the
  *    AccessibilityService (system event thread).
  */
@@ -67,6 +74,6 @@ class AuthorizedLaunchTracker @Inject constructor() {
     fun clearAll() = grants.clear()
 
     companion object {
-        const val AUTHORIZATION_WINDOW_MS: Long = 60_000L
+        const val AUTHORIZATION_WINDOW_MS: Long = 5 * 60 * 1000L
     }
 }

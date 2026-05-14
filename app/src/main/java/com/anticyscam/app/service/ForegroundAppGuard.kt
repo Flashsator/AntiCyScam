@@ -45,6 +45,21 @@ class ForegroundAppGuard @Inject constructor(
     @Volatile
     private var lastObservedPackage: String? = null
 
+    /**
+     * The bound package currently treated as the user's active session.
+     * Set when [evaluate] first consumes an authorization for a bound app;
+     * cleared when [evaluate] observes a *different* non-system package
+     * surfacing in the foreground (i.e. the user genuinely switched away).
+     *
+     * While this is set, repeated foreground events for the same package —
+     * including in-app window transitions and brief overlays from
+     * SystemUI / IME / OTP toasts — short-circuit to AllowAuthorized
+     * without consuming another grant, so a mid-session warning cannot
+     * be triggered by transient system noise.
+     */
+    @Volatile
+    private var authorizedSessionPackage: String? = null
+
     fun start() {
         boundAppRepository.observeBoundApps()
             .onEach { apps ->
@@ -61,6 +76,7 @@ class ForegroundAppGuard @Inject constructor(
      */
     fun resetLastObserved() {
         lastObservedPackage = null
+        authorizedSessionPackage = null
     }
 
     /**
@@ -76,26 +92,61 @@ class ForegroundAppGuard @Inject constructor(
     /**
      * Decide whether [foregroundPkg] is allowed to stay in the foreground.
      *
-     * - Ignores duplicate-transition events (same package back-to-back).
-     * - Ignores our own UI (we are always allowed).
-     * - Ignores anything outside the user's bound set.
-     * - For bound packages: consumes a pending authorization. No grant ⇒
-     *   the warning must be shown and the user pulled back.
+     * Session model:
+     *  - Our own UI is always Ignored — we never block ourselves.
+     *  - Non-bound foregrounds (LINE / Launcher / system apps / OEM
+     *    surfaces, etc.) are Ignored, but they advance the dedup gate.
+     *    A non-bound foreground that is also a *different package* from
+     *    the last one we saw counts as the user truly leaving the bound
+     *    app and ends the active session.
+     *  - Bound foregrounds:
+     *      * Same package as the previous event → Ignore (dedup).
+     *      * Same package as the active session → AllowAuthorized without
+     *        consuming a new grant. This is what keeps mid-session window
+     *        transitions / IME / OTP toasts from re-triggering the warning.
+     *      * Otherwise → consume a pending authorization. Success opens a
+     *        new session; failure clears any stale session and blocks.
      */
     fun evaluate(foregroundPkg: String, ownPkg: String): Decision {
+        if (foregroundPkg == ownPkg) {
+            lastObservedPackage = foregroundPkg
+            val d: Decision = Decision.Ignore
+            recordDiagnostic(foregroundPkg, d)
+            return d
+        }
+
+        val boundLabel = _snapshot.value[foregroundPkg]
+        if (boundLabel == null) {
+            // Non-bound app in the foreground. If this is genuinely a new
+            // surface (not just a duplicate event), the user left the
+            // bound app and the session ends.
+            if (lastObservedPackage != foregroundPkg) {
+                authorizedSessionPackage = null
+            }
+            lastObservedPackage = foregroundPkg
+            val d: Decision = Decision.Ignore
+            recordDiagnostic(foregroundPkg, d)
+            return d
+        }
+
         val last = lastObservedPackage
-        lastObservedPackage = foregroundPkg
         val decision: Decision = when {
             foregroundPkg == last -> Decision.Ignore
-            foregroundPkg == ownPkg -> Decision.Ignore
-            foregroundPkg !in _snapshot.value -> Decision.Ignore
-            authorizedLaunchTracker.consumeAuthorization(foregroundPkg) ->
+            foregroundPkg == authorizedSessionPackage ->
                 Decision.AllowAuthorized(foregroundPkg)
-            else -> Decision.BlockUnauthorized(
-                packageName = foregroundPkg,
-                label = _snapshot.value[foregroundPkg] ?: foregroundPkg
-            )
+            authorizedLaunchTracker.consumeAuthorization(foregroundPkg) -> {
+                authorizedSessionPackage = foregroundPkg
+                Decision.AllowAuthorized(foregroundPkg)
+            }
+            else -> {
+                authorizedSessionPackage = null
+                Decision.BlockUnauthorized(
+                    packageName = foregroundPkg,
+                    label = boundLabel
+                )
+            }
         }
+        lastObservedPackage = foregroundPkg
         recordDiagnostic(foregroundPkg, decision)
         return decision
     }

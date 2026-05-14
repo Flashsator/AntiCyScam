@@ -93,14 +93,6 @@
             android:launchMode="singleTask"
             android:theme="@style/Theme.AntiCyScam.FullscreenWarning" />
 
-        <!-- Dormant verification (PRD § 3.4) -->
-        <activity
-            android:name=".ui.dormant.DormantVerifyActivity"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:launchMode="singleTask"
-            android:theme="@style/Theme.AntiCyScam" />
-
         <!-- Accessibility service registered for Phase 7. -->
         <service
             android:name=".service.AntiScamAccessibilityService"

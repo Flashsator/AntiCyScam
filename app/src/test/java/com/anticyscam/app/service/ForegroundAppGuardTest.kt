@@ -126,6 +126,53 @@ class ForegroundAppGuardTest {
         assertTrue(decision is ForegroundAppGuard.Decision.BlockUnauthorized)
     }
 
+    @Test
+    fun `system overlay between bound transitions keeps session alive`() {
+        // User taps bank from 防詐器 → grant consumed, session opened.
+        tracker.authorize(boundBank)
+        val enter = guard.evaluate(foregroundPkg = boundBank, ownPkg = ownPkg)
+        assertTrue(enter is ForegroundAppGuard.Decision.AllowAuthorized)
+
+        // Mid-transaction, SystemUI/IME/OTP surface briefly steals focus.
+        val overlay = guard.evaluate(foregroundPkg = unrelated, ownPkg = ownPkg)
+        assertEquals(ForegroundAppGuard.Decision.Ignore, overlay)
+
+        // Bank window returns — no new grant has been issued, but the
+        // session must keep it allowed (this is the production bug fix:
+        // previously this path Blocked because consumeAuthorization had
+        // nothing left to consume).
+        val resume = guard.evaluate(foregroundPkg = boundBank, ownPkg = ownPkg)
+        assertEquals(
+            ForegroundAppGuard.Decision.AllowAuthorized(boundBank),
+            resume
+        )
+    }
+
+    @Test
+    fun `switching to a different bound app ends the session`() {
+        tracker.authorize(boundBank)
+        guard.evaluate(foregroundPkg = boundBank, ownPkg = ownPkg)
+
+        // Different bound app appears without its own grant.
+        val secondBound = guard.evaluate(foregroundPkg = boundLine, ownPkg = ownPkg)
+        assertTrue(secondBound is ForegroundAppGuard.Decision.BlockUnauthorized)
+
+        // Bank returning has no session anymore — block expected.
+        val backToBank = guard.evaluate(foregroundPkg = boundBank, ownPkg = ownPkg)
+        assertTrue(backToBank is ForegroundAppGuard.Decision.BlockUnauthorized)
+    }
+
+    @Test
+    fun `resetLastObserved clears active session`() {
+        tracker.authorize(boundBank)
+        guard.evaluate(foregroundPkg = boundBank, ownPkg = ownPkg)
+        guard.resetLastObserved()
+
+        // No grant, no session, no dedup — must block.
+        val afterReset = guard.evaluate(foregroundPkg = boundBank, ownPkg = ownPkg)
+        assertTrue(afterReset is ForegroundAppGuard.Decision.BlockUnauthorized)
+    }
+
     /**
      * Minimal [BoundAppRepository] subclass that never delivers any flow
      * data, since the tests prime the snapshot directly. Backed by a
