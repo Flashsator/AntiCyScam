@@ -1,17 +1,21 @@
 package com.anticyscam.app.ui.recognition
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -23,8 +27,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.anticyscam.app.ui.theme.AlertYellow
@@ -43,9 +49,15 @@ fun TextRecognitionScreen(
     onDraftChange: (String) -> Unit,
     onAnalyze: (String) -> Unit
 ) {
+    val focusManager = LocalFocusManager.current
+    val noRippleInteraction = remember { MutableInteractionSource() }
     Column(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxSize()
+            .clickable(
+                interactionSource = noRippleInteraction,
+                indication = null
+            ) { focusManager.clearFocus() }
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -63,6 +75,19 @@ fun TextRecognitionScreen(
                     color = TextDisabled
                 )
             },
+            trailingIcon = if (draft.isNotEmpty()) {
+                {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "清除內容",
+                        tint = TextSecondary,
+                        modifier = Modifier.clickable {
+                            onDraftChange("")
+                            focusManager.clearFocus()
+                        }
+                    )
+                }
+            } else null,
             minLines = 6,
             maxLines = 12,
             modifier = Modifier.fillMaxWidth(),
@@ -86,7 +111,10 @@ fun TextRecognitionScreen(
         }
 
         Button(
-            onClick = { onAnalyze(draft) },
+            onClick = {
+                focusManager.clearFocus()
+                onAnalyze(draft)
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(54.dp),
