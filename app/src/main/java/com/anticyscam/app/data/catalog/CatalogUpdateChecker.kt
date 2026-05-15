@@ -3,6 +3,7 @@ package com.anticyscam.app.data.catalog
 import android.content.Context
 import com.anticyscam.app.data.prefs.CatalogUpdatePrefs
 import com.anticyscam.app.data.repository.ScamInfoRepository
+import com.anticyscam.app.domain.model.ScamCatalog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -127,6 +128,9 @@ class CatalogUpdateChecker @Inject constructor(
 
     private suspend fun runDownload(available: State.UpdateAvailable) {
         _state.value = State.Downloading
+        // 必須在 swap 之前讀取，否則 invalidate() 後再 load() 拿到的就是新版本，
+        // diff 結果會空白。
+        val before = runCatching { repository.load() }.getOrNull()
         val tempFile = File(context.filesDir, OVERRIDE_TEMP)
         val finalFile = File(context.filesDir, OVERRIDE_FILE)
         val ok = runCatching {
@@ -146,10 +150,45 @@ class CatalogUpdateChecker @Inject constructor(
         if (ok) {
             prefs.markApplied(available.remoteVersion)
             repository.invalidate()
-            _state.value = State.Done(available.remoteVersion)
+            val after = runCatching { repository.load() }.getOrNull()
+            val summary = if (before != null && after != null) {
+                buildSummary(before, after)
+            } else {
+                null
+            }
+            _state.value = State.Done(available.remoteVersion, summary)
         } else {
             _state.value = State.Failed("更新失敗，稍後再試。")
         }
+    }
+
+    private fun buildSummary(before: ScamCatalog, after: ScamCatalog): UpdateSummary =
+        UpdateSummary(
+            fromVersion = before.version,
+            toVersion = after.version,
+            sections = listOf(
+                sectionDelta("詐騙手法", before.tactics, after.tactics) { it.id },
+                sectionDelta("警示帳號", before.warnedAccounts, after.warnedAccounts) { it.account },
+                sectionDelta("可疑名單", before.suspiciousNames, after.suspiciousNames) { it.name },
+                sectionDelta("詐騙分類", before.categories, after.categories) { it.id },
+                sectionDelta("聯絡管道", before.channels, after.channels) { it.id }
+            )
+        )
+
+    private fun <T> sectionDelta(
+        label: String,
+        oldList: List<T>,
+        newList: List<T>,
+        key: (T) -> String
+    ): SectionDelta {
+        val oldKeys = oldList.map(key).toSet()
+        val newKeys = newList.map(key).toSet()
+        return SectionDelta(
+            label = label,
+            added = (newKeys - oldKeys).size,
+            removed = (oldKeys - newKeys).size,
+            total = newList.size
+        )
     }
 
     private suspend fun fetchVersionJson(): VersionMeta? = withContext(Dispatchers.IO) {
@@ -222,9 +261,28 @@ class CatalogUpdateChecker @Inject constructor(
         ) : State
 
         data object Downloading : State
-        data class Done(val version: Int) : State
+        data class Done(val version: Int, val summary: UpdateSummary? = null) : State
         data class Failed(val message: String) : State
     }
+
+    /**
+     * Per-section delta between two catalog snapshots. `total` is the post-swap
+     * row count for that section, so the user sees "新增 3 筆（目前共 47 筆）".
+     */
+    data class SectionDelta(
+        val label: String,
+        val added: Int,
+        val removed: Int,
+        val total: Int
+    ) {
+        val isChanged: Boolean get() = added > 0 || removed > 0
+    }
+
+    data class UpdateSummary(
+        val fromVersion: Int,
+        val toVersion: Int,
+        val sections: List<SectionDelta>
+    )
 
     private companion object {
         const val VERSION_URL =
