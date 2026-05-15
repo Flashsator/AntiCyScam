@@ -126,9 +126,6 @@ fun ScamInfoScreen(
         }
 
         item {
-            SectionTitle("台灣詐騙手法（${state.allTactics.size} 種）")
-        }
-        item {
             SearchBar(
                 value = state.searchQuery,
                 onValueChange = viewModel::onSearchChanged
