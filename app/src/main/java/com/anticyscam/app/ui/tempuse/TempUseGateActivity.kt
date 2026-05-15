@@ -95,7 +95,8 @@ class TempUseGateActivity : ComponentActivity() {
                             TempUseTracker.Stage.FIRST -> true
                             TempUseTracker.Stage.SECOND -> state.canProceedStage2
                             TempUseTracker.Stage.THIRD,
-                            TempUseTracker.Stage.LOCKED_OUT -> false
+                            TempUseTracker.Stage.LOCKED_OUT,
+                            TempUseTracker.Stage.BANNED -> false
                         }
                         if (willLaunch) {
                             runCatching { stopLockTask() }

@@ -50,7 +50,9 @@ fun TempUseGateScreen(
     val backgroundColor = when (state.stage) {
         TempUseTracker.Stage.FIRST -> SurfaceBlack
         TempUseTracker.Stage.SECOND -> SurfaceBlack
-        TempUseTracker.Stage.THIRD, TempUseTracker.Stage.LOCKED_OUT -> WarningRedDark
+        TempUseTracker.Stage.THIRD,
+        TempUseTracker.Stage.LOCKED_OUT,
+        TempUseTracker.Stage.BANNED -> WarningRedDark
     }
 
     Box(
@@ -64,6 +66,7 @@ fun TempUseGateScreen(
             TempUseTracker.Stage.SECOND -> Stage2(state, onProceed, onCheckBox, onCall165)
             TempUseTracker.Stage.THIRD -> Stage3(state, onCall165, onDismiss)
             TempUseTracker.Stage.LOCKED_OUT -> StageLocked(state, onCall165, onDismiss)
+            TempUseTracker.Stage.BANNED -> StageBanned(state, onCall165)
         }
     }
 }
@@ -374,6 +377,67 @@ private fun StageLocked(
 }
 
 @Composable
+private fun StageBanned(
+    state: TempUseGateViewModel.UiState,
+    onCall165: () -> Unit
+) {
+    // Escalation tier: 10-min watchful window + 3rd warning = 1-hour total
+    // ban on every transfer feature. No 「我知道」 escape, no proceed path.
+    val remaining = formatLockoutHms(state.lockoutRemainingMs)
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceBetween,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.height(40.dp))
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "⛔",
+                color = Color.White,
+                style = MaterialTheme.typography.displayLarge
+            )
+            Text(
+                text = stringResource(R.string.temp_use_banned_title),
+                color = Color.White,
+                style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = stringResource(R.string.temp_use_banned_body, remaining),
+                color = Color.White.copy(alpha = 0.92f),
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = stringResource(R.string.temp_use_calm_mantra),
+                color = AlertYellow,
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center
+            )
+        }
+        Button(
+            onClick = onCall165,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = SurfaceBlack,
+                contentColor = Color.White
+            )
+        ) {
+            Text(
+                text = stringResource(R.string.temp_use_stage3_call_cta),
+                style = MaterialTheme.typography.titleLarge
+            )
+        }
+    }
+}
+
+@Composable
 private fun StageCheckRow(
     checked: Boolean,
     enabled: Boolean,
@@ -410,4 +474,17 @@ private fun formatLockout(ms: Long): String {
     val minutes = total / 60
     val seconds = total % 60
     return "%d:%02d".format(minutes, seconds)
+}
+
+/**
+ * hh:mm:ss formatter for the 1-hour ban — minute-only would compress to
+ * "60:00" at start which reads as a typo. We display HH:MM:SS so the
+ * remaining hour is obvious.
+ */
+private fun formatLockoutHms(ms: Long): String {
+    val total = (ms / 1000).coerceAtLeast(0L)
+    val hours = total / 3600
+    val minutes = (total % 3600) / 60
+    val seconds = total % 60
+    return "%02d:%02d:%02d".format(hours, minutes, seconds)
 }

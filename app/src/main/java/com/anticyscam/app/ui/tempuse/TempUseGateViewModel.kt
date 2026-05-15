@@ -102,15 +102,31 @@ class TempUseGateViewModel @Inject constructor(
                 tickCalmTimer()
             }
             TempUseTracker.Stage.THIRD -> {
-                // Commit the lockout immediately — the user has already
+                // Commit the lockout/ban immediately — the user has already
                 // burned the third attempt simply by reaching this screen.
+                // consume() chooses between 5-min lockout (normal) and 1-hour
+                // ban (when reached during the post-lockout watchful window),
+                // so the resolved stage may be THIRD→LOCKED_OUT or →BANNED.
                 tracker.consume()
-                _state.value = UiState(
-                    stage = TempUseTracker.Stage.THIRD,
-                    lockedDown = true,
-                    lockoutRemainingMs = tracker.snapshot().lockoutUntil - clock.now()
-                )
-                tickLockoutTimer()
+                val resolved = tracker.snapshot()
+                when (resolved.stage) {
+                    TempUseTracker.Stage.BANNED -> {
+                        _state.value = UiState(
+                            stage = TempUseTracker.Stage.BANNED,
+                            lockedDown = true,
+                            lockoutRemainingMs = (resolved.banUntil - clock.now()).coerceAtLeast(0L)
+                        )
+                        tickTerminalTimer()
+                    }
+                    else -> {
+                        _state.value = UiState(
+                            stage = TempUseTracker.Stage.THIRD,
+                            lockedDown = true,
+                            lockoutRemainingMs = (resolved.lockoutUntil - clock.now()).coerceAtLeast(0L)
+                        )
+                        tickTerminalTimer()
+                    }
+                }
             }
             TempUseTracker.Stage.LOCKED_OUT -> {
                 _state.value = UiState(
@@ -118,7 +134,15 @@ class TempUseGateViewModel @Inject constructor(
                     lockedDown = true,
                     lockoutRemainingMs = (snap.lockoutUntil - clock.now()).coerceAtLeast(0L)
                 )
-                tickLockoutTimer()
+                tickTerminalTimer()
+            }
+            TempUseTracker.Stage.BANNED -> {
+                _state.value = UiState(
+                    stage = TempUseTracker.Stage.BANNED,
+                    lockedDown = true,
+                    lockoutRemainingMs = (snap.banUntil - clock.now()).coerceAtLeast(0L)
+                )
+                tickTerminalTimer()
             }
         }
     }
@@ -157,7 +181,9 @@ class TempUseGateViewModel @Inject constructor(
                 fireLaunch(activityContext)
                 return true
             }
-            TempUseTracker.Stage.THIRD, TempUseTracker.Stage.LOCKED_OUT -> {
+            TempUseTracker.Stage.THIRD,
+            TempUseTracker.Stage.LOCKED_OUT,
+            TempUseTracker.Stage.BANNED -> {
                 // No proceed path. UI shows 165 + dismiss only.
                 return false
             }
@@ -189,11 +215,22 @@ class TempUseGateViewModel @Inject constructor(
         }
     }
 
-    private fun tickLockoutTimer() {
+    /**
+     * Unified countdown ticker for any terminal state (LOCKED_OUT / THIRD
+     * showing lockout / BANNED). Reads whichever deadline is active on the
+     * current snapshot so we don't need a separate ticker per stage.
+     */
+    private fun tickTerminalTimer() {
         tickJob?.cancel()
         tickJob = viewModelScope.launch {
             while (true) {
-                val remaining = (tracker.snapshot().lockoutUntil - clock.now()).coerceAtLeast(0L)
+                val snap = tracker.snapshot()
+                val deadline = when {
+                    snap.banUntil > 0L -> snap.banUntil
+                    snap.lockoutUntil > 0L -> snap.lockoutUntil
+                    else -> 0L
+                }
+                val remaining = (deadline - clock.now()).coerceAtLeast(0L)
                 _state.value = _state.value.copy(lockoutRemainingMs = remaining)
                 if (remaining <= 0L) {
                     _returnToHome.tryEmit(Unit)

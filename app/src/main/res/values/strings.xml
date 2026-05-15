@@ -105,6 +105,14 @@
     <string name="temp_use_locked_body">為了保護您的資產，防詐器已暫時封鎖臨時轉帳。\n剩餘冷卻時間：%1$s</string>
     <string name="temp_use_locked_call">撥打 165 諮詢</string>
 
+    <!-- Post-lockout 10-min watchful banner (主頁頂部橘色條) -->
+    <string name="temp_use_watchful_banner_title">⚠️ 警示期 — 剩 %1$s</string>
+    <string name="temp_use_watchful_banner_body">此期間若再達第三次臨時轉帳，將強制封鎖 1 小時。</string>
+
+    <!-- 1-hour escalation ban (gate screen + main-screen overlay) -->
+    <string name="temp_use_banned_title">⛔ 已強制封鎖轉帳功能 1 小時</string>
+    <string name="temp_use_banned_body">防詐器轉帳相關功能已被暫時鎖定。\n您仍可使用詐騙專區查看防詐資訊。\n\n剩餘封鎖時間：%1$s</string>
+
     <!-- Daily-add lockdown screen (畫面 10) -->
     <string name="daily_add_lock_title">⚠️ 偵測到異常新增行為</string>
     <string name="daily_add_lock_body">您今日已新增 3 筆轉帳帳號，這是常見的詐騙誘導模式。\n為了您的資產安全，新增功能已封鎖 24 小時。</string>

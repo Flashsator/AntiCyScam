@@ -3,12 +3,17 @@ package com.anticyscam.app.ui.mainfunction
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -40,9 +45,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -55,9 +65,11 @@ import com.anticyscam.app.ui.gate.AccessibilityGateScreen
 import com.anticyscam.app.ui.gate.AccessibilityGateViewModel
 import com.anticyscam.app.ui.lockdown.DailyAddLockActivity
 import com.anticyscam.app.ui.tempuse.TempUseGateActivity
+import com.anticyscam.app.ui.theme.AlertYellow
 import com.anticyscam.app.ui.theme.SurfaceBlack
 import com.anticyscam.app.ui.theme.TextPrimary
 import com.anticyscam.app.ui.theme.WarningRed
+import com.anticyscam.app.ui.theme.WarningRedDark
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -99,6 +111,7 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
     val isDailyLocked = dailyLockMs > 0L
     val boundApps by mainViewModel.boundApps.collectAsState()
     val pendingApp by mainViewModel.pendingApp.collectAsState()
+    val tempUseUiState by transferViewModel.tempUseUiState.collectAsState()
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -113,6 +126,18 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
     val editsExhaustedMsg = stringResource(R.string.transfer_edits_exhausted_toast)
     val editWindowClosedMsg = stringResource(R.string.transfer_edit_window_closed_toast)
     val dailyLockedTemplate = stringResource(R.string.daily_add_locked_remaining)
+
+    // Defence in depth: while the 1-hour ban is active, force-close any
+    // already-open picker / add / edit surface. The Scaffold overlay below
+    // also blocks taps, but closing modals here keeps the dismissed-from-ban
+    // state idempotent across rotation and configuration changes.
+    LaunchedEffect(tempUseUiState.isBanned) {
+        if (tempUseUiState.isBanned) {
+            mainViewModel.cancelPending()
+            showAddDialog = false
+            editingAccount = null
+        }
+    }
 
     LaunchedEffect(addResult) {
         when (val r = addResult) {
@@ -160,13 +185,24 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
         containerColor = SurfaceBlack,
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { inner ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(inner)
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Watchful (post-5-min-lockout) banner sits at the very top per
+                // spec — orange bar with 10-min countdown. Skipped when banned
+                // since the overlay below takes over.
+                if (tempUseUiState.isWatchful && !tempUseUiState.isBanned) {
+                    TempUseWatchfulBanner(remainingMs = tempUseUiState.watchfulRemainingMs)
+                }
+
             Text(
                 text = stringResource(R.string.nav_main),
                 color = WarningRed,
@@ -228,10 +264,21 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
                 onAccountEdit = { account -> editingAccount = account },
                 modifier = Modifier.weight(1f)
             )
+            }
+            // 1-hour ban overlay. Scoped to the 防詐器 tab's content area on
+            // purpose — sits inside the Scaffold so it covers transfer/list
+            // surfaces but stays underneath the tab bar, leaving 詐騙專區 and
+            // other tabs reachable per spec.
+            if (tempUseUiState.isBanned) {
+                TempUseBannedOverlay(
+                    remainingMs = tempUseUiState.banRemainingMs,
+                    onCall165 = { dial165(context) }
+                )
+            }
         }
     }
 
-    pendingApp?.let { app ->
+    pendingApp?.takeIf { !tempUseUiState.isBanned }?.let { app ->
         TransferAccountPickerSheet(
             pendingApp = app,
             items = uiList,
@@ -252,7 +299,7 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
         )
     }
 
-    if (showAddDialog) {
+    if (showAddDialog && !tempUseUiState.isBanned) {
         AddTransferAccountDialog(
             onDismiss = { showAddDialog = false },
             onConfirm = { name, number, bankCode ->
@@ -262,7 +309,7 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
         )
     }
 
-    editingAccount?.let { account ->
+    editingAccount?.takeIf { !tempUseUiState.isBanned }?.let { account ->
         AddTransferAccountDialog(
             onDismiss = { editingAccount = null },
             onConfirm = { name, number, bankCode ->
@@ -421,4 +468,105 @@ private fun DailyAddLockBanner(remainingMs: Long) {
             style = MaterialTheme.typography.bodyMedium
         )
     }
+}
+
+/**
+ * Post-lockout 10-minute watchful window indicator. Orange bar (AlertYellow)
+ * with black text — sits at the very top of the 防詐器 tab so it is the first
+ * thing the user sees on entering. Communicates two facts:
+ *  - the user is still under heightened scrutiny
+ *  - hitting THIRD again inside this window escalates to a 1-hour BAN
+ */
+@Composable
+private fun TempUseWatchfulBanner(remainingMs: Long) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(AlertYellow)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = stringResource(
+                    R.string.temp_use_watchful_banner_title,
+                    formatRemainingHms(remainingMs)
+                ),
+                color = SurfaceBlack,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = stringResource(R.string.temp_use_watchful_banner_body),
+                color = SurfaceBlack,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+/**
+ * Full-screen 1-hour ban overlay. Lives inside the Scaffold so the tab bar
+ * stays reachable — switching to 詐騙專區 / 設定 is intentionally NOT blocked
+ * (only transfer-related flows are). The transparent backdrop swallows taps
+ * via clickable {} so nothing underneath can receive input.
+ */
+@Composable
+private fun TempUseBannedOverlay(remainingMs: Long, onCall165: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(WarningRedDark.copy(alpha = 0.97f))
+            .clickable(enabled = true, onClick = {}),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "⛔",
+                color = TextPrimary,
+                fontSize = 56.sp
+            )
+            Text(
+                text = stringResource(R.string.temp_use_banned_title),
+                color = TextPrimary,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = stringResource(
+                    R.string.temp_use_banned_body,
+                    formatRemainingHms(remainingMs)
+                ),
+                color = TextPrimary,
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            FilledTonalButton(
+                onClick = onCall165,
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = Color.White,
+                    contentColor = WarningRedDark
+                ),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.temp_use_stage3_call_cta),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+private fun dial165(context: Context) {
+    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:165"))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    context.startActivity(intent)
 }

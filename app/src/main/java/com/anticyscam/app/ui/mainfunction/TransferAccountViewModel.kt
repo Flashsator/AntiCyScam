@@ -7,6 +7,7 @@ import com.anticyscam.app.R
 import com.anticyscam.app.data.prefs.AntiScamClock
 import com.anticyscam.app.data.prefs.DailyAddTracker
 import com.anticyscam.app.data.prefs.NowSnapshot
+import com.anticyscam.app.data.prefs.TempUseTracker
 import com.anticyscam.app.data.repository.TransferAccountRepository
 import com.anticyscam.app.domain.model.TransferAccount
 import com.anticyscam.app.domain.model.TransferAccountState
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -26,7 +28,8 @@ class TransferAccountViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val repository: TransferAccountRepository,
     private val clock: AntiScamClock,
-    private val dailyTracker: DailyAddTracker
+    private val dailyTracker: DailyAddTracker,
+    private val tempUseTracker: TempUseTracker
 ) : ViewModel() {
 
     val accounts: StateFlow<List<TransferAccount>> = repository.observeAccounts()
@@ -65,6 +68,34 @@ class TransferAccountViewModel @Inject constructor(
     val dailyLockRemainingMs: StateFlow<Long> = combine(dailyState, tick) { state, now ->
         state.remainingLockMs(now)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
+
+    /**
+     * Drives the post-3rd escalation surfaces on the main screen:
+     *  - [TempUseUiState.isBanned]  → render full 1-hour ban overlay; block
+     *    every transfer action (new/edit/picker/launch).
+     *  - [TempUseUiState.isWatchful] → render orange warning bar with the
+     *    10-min countdown above the transfer list.
+     *
+     * The 1-sec tick double-duties as a sweeper: each emission calls
+     * [TempUseTracker.clearLockoutIfElapsed], so the LOCKED_OUT → WATCHFUL
+     * and BANNED → reset transitions happen automatically even if the user
+     * is just idling on the main screen.
+     */
+    val tempUseUiState: StateFlow<TempUseUiState> = tick.map { now ->
+        tempUseTracker.clearLockoutIfElapsed()
+        val snap = tempUseTracker.snapshot()
+        when {
+            snap.stage == TempUseTracker.Stage.BANNED -> TempUseUiState(
+                isBanned = true,
+                banRemainingMs = (snap.banUntil - now.wallMillis).coerceAtLeast(0L)
+            )
+            snap.watchfulUntil > 0L -> TempUseUiState(
+                isWatchful = true,
+                watchfulRemainingMs = (snap.watchfulUntil - now.wallMillis).coerceAtLeast(0L)
+            )
+            else -> TempUseUiState()
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TempUseUiState())
 
     init {
         viewModelScope.launch {
@@ -127,6 +158,19 @@ class TransferAccountViewModel @Inject constructor(
     data class AccountUi(
         val account: TransferAccount,
         val state: TransferAccountState
+    )
+
+    /**
+     * Drives the post-3rd escalation surfaces on the main screen. The two
+     * states are mutually exclusive — when [isBanned] is true the banner
+     * is hidden and the overlay takes the whole screen; when [isWatchful]
+     * is true only the top orange bar shows.
+     */
+    data class TempUseUiState(
+        val isBanned: Boolean = false,
+        val banRemainingMs: Long = 0L,
+        val isWatchful: Boolean = false,
+        val watchfulRemainingMs: Long = 0L
     )
 
     sealed interface AddOutcome {
