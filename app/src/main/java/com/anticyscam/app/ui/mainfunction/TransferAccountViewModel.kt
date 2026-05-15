@@ -142,6 +142,30 @@ class TransferAccountViewModel @Inject constructor(
         _addResult.value = AddOutcome.Idle
     }
 
+    /**
+     * Picker short-circuit for BAN states. Returns true when the caller MUST
+     * skip launching [TempUseGateActivity] and let the in-page [TempUseBannedOverlay]
+     * handle the user instead. Two cases:
+     *  - already in BANNED → overlay is already (or about to be) visible.
+     *  - in THIRD during the watchful window → next consume() escalates to
+     *    BAN. We commit that escalation here so the overlay shows immediately
+     *    on the next 1-sec tick instead of routing through the gate Activity
+     *    (which would render BAN full-screen and hide the tab bar).
+     *
+     * For every other stage (FIRST / SECOND / THIRD without watchful /
+     * LOCKED_OUT) the caller proceeds with the normal Gate Activity launch.
+     */
+    fun tryShortCircuitForBan(): Boolean {
+        tempUseTracker.clearLockoutIfElapsed()
+        val snap = tempUseTracker.snapshot()
+        if (snap.stage == TempUseTracker.Stage.BANNED) return true
+        if (snap.stage == TempUseTracker.Stage.THIRD && snap.watchfulUntil > 0L) {
+            tempUseTracker.consume()
+            return true
+        }
+        return false
+    }
+
     private fun TransferAccountRepository.AddResult.toOutcome(): AddOutcome = when (this) {
         is TransferAccountRepository.AddResult.Success ->
             AddOutcome.Success(id, countToday, warning)

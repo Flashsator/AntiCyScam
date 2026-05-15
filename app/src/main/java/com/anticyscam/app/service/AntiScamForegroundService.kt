@@ -128,8 +128,8 @@ class AntiScamForegroundService : Service() {
     }
 
     /**
-     * 三項守門檢查 — 任一不符 → 撤掉前台通知並 stopSelf，確保「保護中」通知
-     * 不會在條件不齊時殘留。回傳 true 代表此次檢查通過、服務可繼續執行。
+     * 三項守門檢查 — 任一不符就 stopSelf。v1 邏輯刻意保持簡單：使用者必須先把
+     * 四項都打開才有保護，少一項就把服務拉下、讓 App 進入 gate 狀態。
      */
     private fun enforceProtectionState(): Boolean {
         val a11yEnabled = AccessibilityChecker.isOurServiceEnabled(this)

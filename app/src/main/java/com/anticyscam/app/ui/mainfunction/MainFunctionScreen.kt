@@ -190,6 +190,13 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
                 .fillMaxSize()
                 .padding(inner)
         ) {
+            // BAN period: skip composing the underlying page entirely. The
+            // overlay covers it visually anyway, but keeping the transfer list
+            // + per-card 1s countdown alive underneath causes every-second
+            // recomposition churn — felt as jank when the user switches tabs
+            // because Compose has to tear down all that ticking state at the
+            // same moment it builds the new tab.
+            if (!tempUseUiState.isBanned) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -197,9 +204,8 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Watchful (post-5-min-lockout) banner sits at the very top per
-                // spec — orange bar with 10-min countdown. Skipped when banned
-                // since the overlay below takes over.
-                if (tempUseUiState.isWatchful && !tempUseUiState.isBanned) {
+                // spec — orange bar with 10-min countdown.
+                if (tempUseUiState.isWatchful) {
                     TempUseWatchfulBanner(remainingMs = tempUseUiState.watchfulRemainingMs)
                 }
 
@@ -265,6 +271,7 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
                 modifier = Modifier.weight(1f)
             )
             }
+            }
             // 1-hour ban overlay. Scoped to the 防詐器 tab's content area on
             // purpose — sits inside the Scaffold so it covers transfer/list
             // surfaces but stays underneath the tab bar, leaving 詐騙專區 and
@@ -289,6 +296,7 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
                     accountUi = accountUi,
                     app = app,
                     viewModel = mainViewModel,
+                    transferViewModel = transferViewModel,
                     snackbarHostState = snackbarHostState,
                     scope = scope,
                     copiedMsg = copiedMsg,
@@ -405,6 +413,7 @@ private fun handlePickerSelection(
     accountUi: TransferAccountViewModel.AccountUi,
     app: BoundApp,
     viewModel: MainFunctionViewModel,
+    transferViewModel: TransferAccountViewModel,
     snackbarHostState: SnackbarHostState,
     scope: CoroutineScope,
     copiedMsg: String,
@@ -415,6 +424,12 @@ private fun handlePickerSelection(
         TransferAccountState.Default,
         is TransferAccountState.PendingMaturation -> {
             viewModel.cancelPending()
+            // BAN escalation must NOT route through TempUseGateActivity — that
+            // Activity covers the whole screen and hides the tab bar, defeating
+            // the in-page TempUseBannedOverlay that intentionally keeps
+            // 詐騙專區 / 設定 reachable. Commit the escalation locally and let
+            // the next 1-sec tick raise the overlay instead.
+            if (transferViewModel.tryShortCircuitForBan()) return
             context.startActivity(
                 TempUseGateActivity.newIntent(
                     context = context,

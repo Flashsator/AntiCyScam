@@ -62,7 +62,7 @@
 
     <!-- Main-function tab inline gate (requirement #3, revised) -->
     <string name="gate_inline_title">啟用防詐器保護</string>
-    <string name="gate_inline_subtitle">以下三項全部啟用後，才能使用防詐器轉帳保護功能</string>
+    <string name="gate_inline_subtitle">以下四項全部啟用後，才能使用防詐器轉帳保護功能</string>
     <string name="gate_item_a11y">無障礙服務</string>
     <string name="gate_item_a11y_desc">攔截綁定 App 的直接開啟並提醒</string>
     <string name="gate_item_admin">裝置管理員</string>
@@ -75,7 +75,7 @@
     <string name="gate_action_enable">前往啟用</string>
     <string name="gate_status_on">已啟用</string>
     <string name="gate_status_off">尚未啟用</string>
-    <string name="gate_all_ready_hint">三項全部啟用後，畫面會自動切換為防詐器主功能</string>
+    <string name="gate_all_ready_hint">四項全部啟用後，畫面會自動切換為防詐器主功能</string>
     <string name="gate_admin_fallback_hint">此版本系統未提供「啟用裝置管理員」直接入口，請手動點選：設定 → 安全 → 裝置管理員應用程式 → 開啟「防詐器」</string>
     <string name="gate_accessibility_open_hint">若沒看到「防詐器」開關，請在清單中向下捲動找「防詐器保護服務」</string>
     <string name="gate_launch_failed">無法開啟系統設定（%1$s），請手動到 設定 App 內開啟</string>
