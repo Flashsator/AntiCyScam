@@ -18,6 +18,12 @@ hiltNavigationCompose = "1.2.0"
 
 coil = "2.7.0"
 
+mlkitTextRecognition = "16.0.1"
+mlkitTextRecognitionChinese = "16.0.1"
+
+voskAndroid = "0.3.47"
+jna = "5.13.0"
+
 junit = "4.13.2"
 junitExt = "1.2.1"
 espresso = "3.6.1"
@@ -66,6 +72,14 @@ androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navig
 
 # Coil (image loading for app icons)
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+
+# ML Kit OCR (screenshot recognition, on-device, free)
+mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
+mlkit-text-recognition-chinese = { group = "com.google.mlkit", name = "text-recognition-chinese", version.ref = "mlkitTextRecognitionChinese" }
+
+# Vosk on-device STT (voice recognition from audio file)
+vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "voskAndroid" }
+jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 
 # Test
 junit = { group = "junit", name = "junit", version.ref = "junit" }

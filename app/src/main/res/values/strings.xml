@@ -4,8 +4,11 @@
 
     <!-- Bottom navigation -->
     <string name="nav_main">防詐器</string>
-    <string name="nav_scam_info">詐騙專區</string>
+    <string name="nav_scam_info">防詐專區</string>
     <string name="nav_setting">設定</string>
+
+    <!-- Share-sheet label when receiving ACTION_SEND from LINE / FB / Chrome / screenshot apps -->
+    <string name="share_recognition_label">分享到防詐器辨識</string>
 
     <!-- Accessibility gate (Phase 2) -->
     <string name="gate_title">請啟用無障礙服務</string>
@@ -111,7 +114,7 @@
 
     <!-- 1-hour escalation ban (gate screen + main-screen overlay) -->
     <string name="temp_use_banned_title">⛔ 已強制封鎖轉帳功能 1 小時</string>
-    <string name="temp_use_banned_body">防詐器轉帳相關功能已被暫時鎖定。\n您仍可使用詐騙專區查看防詐資訊。\n\n剩餘封鎖時間：%1$s</string>
+    <string name="temp_use_banned_body">防詐器轉帳相關功能已被暫時鎖定。\n您仍可使用防詐專區查看防詐資訊。\n\n剩餘封鎖時間：%1$s</string>
 
     <!-- Daily-add lockdown screen (畫面 10) -->
     <string name="daily_add_lock_title">⚠️ 偵測到異常新增行為</string>

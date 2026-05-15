@@ -28,6 +28,10 @@
     <!-- Vibrate for warning haptics -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Network access for 防詐專區 article thumbnails (Coil loads imageUrl).
+         If a tactic only has a bundled imageAsset, no network is touched. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Fallback intent filter visibility for sideload + Play Store policy.
          Even with QUERY_ALL_PACKAGES, declaring <queries> is a defensive fallback. -->
     <queries>
@@ -92,6 +96,32 @@
             android:exported="false"
             android:launchMode="singleTask"
             android:theme="@style/Theme.AntiCyScam.FullscreenWarning" />
+
+        <!-- 防詐專區 top toolbar → 截圖辨識 / 文字辨識 / 語音辨識 host.
+             Also registered as ACTION_SEND target so users can share suspicious
+             content from LINE / FB / Chrome / screenshot apps directly into
+             the scam-info recognition flow. -->
+        <activity
+            android:name=".ui.recognition.RecognitionActivity"
+            android:exported="true"
+            android:label="@string/share_recognition_label"
+            android:theme="@style/Theme.AntiCyScam">
+            <intent-filter android:label="@string/share_recognition_label">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter android:label="@string/share_recognition_label">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter android:label="@string/share_recognition_label">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="audio/*" />
+            </intent-filter>
+        </activity>
 
         <!-- Accessibility service registered for Phase 7. -->
         <service

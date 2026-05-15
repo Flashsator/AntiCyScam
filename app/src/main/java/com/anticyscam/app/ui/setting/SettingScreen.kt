@@ -3,6 +3,7 @@ package com.anticyscam.app.ui.setting
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,11 +11,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -78,6 +82,7 @@ fun SettingScreen() {
     val diagnostic by viewModel.diagnostic.collectAsState()
     val serviceAlive by viewModel.accessibilityServiceAlive.collectAsState()
     val pendingClear by viewModel.pendingClear.collectAsState()
+    val catalogMeta by viewModel.catalogMeta.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -126,11 +131,8 @@ fun SettingScreen() {
             item {
                 DiagnosticCard(
                     serviceAlive = serviceAlive,
-                    accessibilityEnabled = status.accessibilityEnabled,
-                    batteryIgnored = status.batteryOptimizationIgnored,
                     overlayGranted = status.overlayPermissionGranted,
                     diagnostic = diagnostic,
-                    onRequestBattery = viewModel::requestBatteryExemption,
                     onRequestOverlay = viewModel::requestOverlayPermission,
                     onFireTestWarning = viewModel::fireTestWarning
                 )
@@ -139,6 +141,12 @@ fun SettingScreen() {
                 StatsCard(
                     boundAppCount = status.boundAppCount,
                     transferAccountCount = status.transferAccountCount
+                )
+            }
+            item {
+                DataSourceCard(
+                    meta = catalogMeta,
+                    onOpenSource = { url -> openExternalUrl(context, url) }
                 )
             }
             item {
@@ -318,6 +326,104 @@ private fun StatsRow(label: String, value: String) {
 }
 
 @Composable
+private fun DataSourceCard(
+    meta: SettingViewModel.CatalogMeta,
+    onOpenSource: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDim),
+        border = BorderStroke(1.dp, DividerGray)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Info,
+                    contentDescription = null,
+                    tint = AlertYellow
+                )
+                Text(
+                    text = "防詐資料來源",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            if (meta.version > 0 || meta.lastUpdated.isNotEmpty()) {
+                val versionPart = if (meta.version > 0) "資料版本 v${meta.version}" else ""
+                val datePart = if (meta.lastUpdated.isNotEmpty()) "更新日 ${meta.lastUpdated}" else ""
+                Text(
+                    text = listOf(versionPart, datePart).filter { it.isNotEmpty() }.joinToString("　·　"),
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            if (meta.sources.isEmpty()) {
+                Text(
+                    text = "資料整理自台灣官方反詐騙公開資訊。",
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            } else {
+                Text(
+                    text = "本 App 內所有詐騙手法、警示帳戶與別名清單，皆整理自以下官方來源（點擊開啟官網）：",
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                meta.sources.forEach { src ->
+                    OfficialSourceRow(source = src, onClick = { onOpenSource(src.url) })
+                }
+            }
+            Text(
+                text = "本 App 非政府機關，亦無與上述單位合作；資料僅供衛教參考，個案請以 165 公告與警方查證為準。",
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+@Composable
+private fun OfficialSourceRow(
+    source: SettingViewModel.OfficialSource,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+            contentDescription = null,
+            tint = AlertYellow,
+            modifier = Modifier.size(18.dp)
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = source.label,
+                color = TextPrimary,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = source.url,
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+@Composable
 private fun HotlineCard(onDial: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -462,15 +568,12 @@ private fun ClearConfirmDialog(onCancel: () -> Unit, onConfirm: () -> Unit) {
 @Composable
 private fun DiagnosticCard(
     serviceAlive: Boolean,
-    accessibilityEnabled: Boolean,
-    batteryIgnored: Boolean,
     overlayGranted: Boolean,
     diagnostic: ForegroundAppGuard.Diagnostic,
-    onRequestBattery: () -> Unit,
     onRequestOverlay: () -> Unit,
     onFireTestWarning: () -> Unit
 ) {
-    val allHealthy = serviceAlive && accessibilityEnabled && batteryIgnored && overlayGranted
+    val allHealthy = serviceAlive && overlayGranted
     val borderColor = if (allHealthy) SuccessGreen else AlertYellow
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -497,20 +600,6 @@ private fun DiagnosticCard(
                 ok = serviceAlive,
                 okText = "已連線",
                 failText = "尚未連線"
-            )
-            StatusRow(
-                label = "無障礙啟用清單",
-                ok = accessibilityEnabled,
-                okText = "已加入",
-                failText = "未加入"
-            )
-            StatusRow(
-                label = "電池白名單",
-                ok = batteryIgnored,
-                okText = "已加入",
-                failText = "未加入",
-                onAction = if (!batteryIgnored) onRequestBattery else null,
-                actionText = "請求"
             )
             StatusRow(
                 label = "覆蓋層權限",
@@ -600,6 +689,13 @@ private fun formatClockTime(epochMs: Long): String = clockTimeFormatter.format(D
 private fun dial165(context: android.content.Context) {
     val intent = Intent(Intent.ACTION_DIAL).apply {
         data = Uri.parse("tel:165")
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    runCatching { context.startActivity(intent) }
+}
+
+private fun openExternalUrl(context: android.content.Context, url: String) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
     runCatching { context.startActivity(intent) }

@@ -129,7 +129,8 @@
         "要求匯款到「指定帳戶」而非自己合法券商交割戶",
         "投資 App 來源並非 App Store／Play"
       ],
-      "protection": "凡標榜保證獲利皆為詐騙。投資前請至金管會「合法業者查詢」確認，券商交割款只匯入自己名下交割戶。"
+      "protection": "凡標榜保證獲利皆為詐騙。投資前請至金管會「合法業者查詢」確認，券商交割款只匯入自己名下交割戶。",
+      "sourceUrl": "https://165.npa.gov.tw/"
     },
     {
       "id": "investment_usdt",
@@ -243,7 +244,8 @@
         "傳真／LINE 傳「公文／拘票」",
         "指示前往 ATM 或臨櫃匯款"
       ],
-      "protection": "真正檢警「絕對不會」要求民眾交付存簿、印鑑、密碼或匯款。立即掛電話並撥 165 查證。"
+      "protection": "真正檢警「絕對不會」要求民眾交付存簿、印鑑、密碼或匯款。立即掛電話並撥 165 查證。",
+      "sourceUrl": "https://www.cib.gov.tw/"
     },
     {
       "id": "fake_health_bureau",
@@ -341,7 +343,8 @@
         "頁面要求一次輸入帳號、密碼、OTP",
         "頁面樣式與你印象中的網銀略有差異"
       ],
-      "protection": "切勿從訊息點擊連結。請使用防詐器內已綁定的網銀 App 開啟。若已點擊，立即停用網銀、撥銀行客服。"
+      "protection": "切勿從訊息點擊連結。請使用防詐器內已綁定的網銀 App 開啟。若已點擊，立即停用網銀、撥銀行客服。",
+      "sourceUrl": "https://www.npa.gov.tw/"
     },
     {
       "id": "phishing_delivery_sms",
@@ -397,7 +400,9 @@
         "連結網域非 fetc.net.tw",
         "頁面要求填寫信用卡 + 卡背 3 碼"
       ],
-      "protection": "ETC 補繳請至 fetc.net.tw 官網或遠通電收 App 操作。簡訊連結一律當作釣魚處理。"
+      "protection": "ETC 補繳請至 fetc.net.tw 官網或遠通電收 App 操作。簡訊連結一律當作釣魚處理。",
+      "imageUrl": "https://www.cib.npa.gov.tw/ch/app/data/image?module=wg117&detailNo=986435702545715200&init=N",
+      "sourceUrl": "https://www.cib.npa.gov.tw/ch/app/data/view?module=wg117&id=1893&serno=2c6333b4-f539-41bc-8267-a25902717ad5"
     },
     {
       "id": "phishing_invoice",
@@ -694,7 +699,9 @@
         "工作內容是「幫忙提款／收件／轉帳」",
         "要求提供存簿、印鑑、提款卡"
       ],
-      "protection": "提供帳戶、提款卡、印鑑給他人即可能涉及洗錢、詐欺幫助犯。任何要求交付這些物品的工作皆為詐騙。"
+      "protection": "提供帳戶、提款卡、印鑑給他人即可能涉及洗錢、詐欺幫助犯。任何要求交付這些物品的工作皆為詐騙。",
+      "imageUrl": "https://www.cib.npa.gov.tw/ch/app/data/image?module=wg117&detailNo=1039406959947681792&init=N",
+      "sourceUrl": "https://www.cib.npa.gov.tw/ch/app/data/view?module=wg117&id=1893&serno=b7b6c528-3624-4649-ab96-d12031ebc3e6"
     },
     {
       "id": "employment_id_collection",
@@ -1017,6 +1024,38 @@
         "強調「不修明天就沒網路」"
       ],
       "protection": "中華電信故障處理請撥 123 確認。任何要求改路由器設定的電話一律掛斷。"
+    }
+  ],
+  "suspiciousNames": [
+    {
+      "name": "明森國際投顧",
+      "aliasType": "FAKE_BROKERAGE",
+      "source": "placeholder demo",
+      "reportedDate": "2026-05-15",
+      "note": "示範資料：假冒投顧名稱，正式版本應替換為 165 公告的最新通緝／警示名單。"
+    },
+    {
+      "name": "@invest_pro_tw",
+      "aliasType": "LINE",
+      "source": "placeholder demo",
+      "reportedDate": "2026-05-15",
+      "note": "示範資料：常見假投顧 LINE ID 模板，實際清單請由維運批次更新。"
+    },
+    {
+      "name": "飆股老師群組",
+      "aliasType": "GROUP",
+      "source": "placeholder demo",
+      "reportedDate": "2026-05-15",
+      "note": "示範資料：典型假投資群組命名模式。"
+    }
+  ],
+  "warnedAccounts": [
+    {
+      "account": "00000000000000",
+      "bank": "示範銀行",
+      "source": "placeholder demo",
+      "reportedDate": "2026-05-15",
+      "note": "示範資料：實際警示帳戶清單請由維運從 165／聯徵管制名單匯入。"
     }
   ]
 }

@@ -57,6 +57,12 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    androidResources {
+        // The Vosk model ZIP is already compressed; AAPT re-deflating it just
+        // burns CPU at install time and produces no size savings. Keep it raw.
+        noCompress += "zip"
+    }
 }
 
 dependencies {
@@ -101,6 +107,14 @@ dependencies {
 
     // Serialization (scam-catalog JSON in assets)
     implementation(libs.kotlinx.serialization.json)
+
+    // ML Kit on-device OCR (Chinese, for 截圖辨識)
+    implementation(libs.mlkit.text.recognition)
+    implementation(libs.mlkit.text.recognition.chinese)
+
+    // Vosk on-device speech-to-text (for 語音辨識)
+    implementation(libs.vosk.android)
+    implementation(libs.jna) { artifact { type = "aar" } }
 
     // Test
     testImplementation(libs.junit)

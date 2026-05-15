@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.anticyscam.app.data.repository.BoundAppRepository
+import com.anticyscam.app.data.repository.ScamInfoRepository
 import com.anticyscam.app.data.repository.TransferAccountRepository
 import com.anticyscam.app.service.AntiScamAccessibilityService
 import com.anticyscam.app.service.AuthorizedLaunchTracker
@@ -41,7 +42,8 @@ class SettingViewModel @Inject constructor(
     private val boundAppRepository: BoundAppRepository,
     private val transferAccountRepository: TransferAccountRepository,
     private val authorizedLaunchTracker: AuthorizedLaunchTracker,
-    private val foregroundAppGuard: ForegroundAppGuard
+    private val foregroundAppGuard: ForegroundAppGuard,
+    private val scamInfoRepository: ScamInfoRepository
 ) : ViewModel() {
 
     private val accessibilityEnabled = MutableStateFlow(
@@ -99,6 +101,22 @@ class SettingViewModel @Inject constructor(
 
     private val _pendingClear = MutableStateFlow(false)
     val pendingClear: StateFlow<Boolean> = _pendingClear.asStateFlow()
+
+    private val _catalogMeta = MutableStateFlow(CatalogMeta())
+    val catalogMeta: StateFlow<CatalogMeta> = _catalogMeta.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            runCatching { scamInfoRepository.load() }
+                .onSuccess { catalog ->
+                    _catalogMeta.value = CatalogMeta(
+                        version = catalog.version,
+                        lastUpdated = catalog.lastUpdated,
+                        sources = OFFICIAL_SOURCES
+                    )
+                }
+        }
+    }
 
     fun refreshAccessibilityStatus() {
         accessibilityEnabled.value = AccessibilityChecker.isOurServiceEnabled(appContext)
@@ -180,4 +198,47 @@ class SettingViewModel @Inject constructor(
         val deviceAdminActive: Boolean = false,
         val notificationsEnabled: Boolean = false
     )
+
+    data class CatalogMeta(
+        val version: Int = 0,
+        val lastUpdated: String = "",
+        val sources: List<OfficialSource> = emptyList()
+    )
+
+    data class OfficialSource(val label: String, val url: String)
+
+    private companion object {
+        // 寫死的官方來源清單，避免日後 JSON 被誤改混入無法驗證的非官方項目。
+        // 維運若要新增來源，必須先確認對方為政府機關／官方專線並修改這份清單。
+        val OFFICIAL_SOURCES = listOf(
+            OfficialSource(
+                label = "165 反詐騙諮詢專線（內政部警政署）",
+                url = "https://165.npa.gov.tw/"
+            ),
+            OfficialSource(
+                label = "內政部警政署 刑事警察局",
+                url = "https://www.cib.gov.tw/"
+            ),
+            OfficialSource(
+                label = "行政院 打詐國家隊",
+                url = "https://www.ey.gov.tw/"
+            ),
+            OfficialSource(
+                label = "數位發展部",
+                url = "https://moda.gov.tw/"
+            ),
+            OfficialSource(
+                label = "金融監督管理委員會",
+                url = "https://www.fsc.gov.tw/"
+            ),
+            OfficialSource(
+                label = "法務部 調查局",
+                url = "https://www.mjib.gov.tw/"
+            ),
+            OfficialSource(
+                label = "國家通訊傳播委員會 NCC",
+                url = "https://www.ncc.gov.tw/"
+            )
+        )
+    }
 }

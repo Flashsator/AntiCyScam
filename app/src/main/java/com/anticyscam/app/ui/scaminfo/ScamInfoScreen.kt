@@ -31,9 +31,13 @@ import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Mail
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -48,11 +52,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.anticyscam.app.domain.model.ChannelIcon
@@ -61,6 +70,8 @@ import com.anticyscam.app.domain.model.EmergencyChannel
 import com.anticyscam.app.domain.model.ScamCategory
 import com.anticyscam.app.domain.model.ScamSeverity
 import com.anticyscam.app.domain.model.ScamTactic
+import com.anticyscam.app.domain.recognition.RecognitionMode
+import com.anticyscam.app.ui.recognition.RecognitionActivity
 import com.anticyscam.app.ui.theme.AlertYellow
 import com.anticyscam.app.ui.theme.DividerGray
 import com.anticyscam.app.ui.theme.SurfaceBlack
@@ -73,7 +84,7 @@ import com.anticyscam.app.ui.theme.WarningRed
 import com.anticyscam.app.ui.theme.WarningRedLight
 
 /**
- * 反詐專區 — driven by [ScamInfoRepository] reading
+ * 防詐專區 — driven by [ScamInfoRepository] reading
  * `assets/scam_catalog.json`. The JSON is the catalog "database" intended to
  * be refreshed by a future GitHub Actions cron; runtime makes no network
  * calls. Provides search, category filter, and direct dialers / links into
@@ -98,6 +109,16 @@ fun ScamInfoScreen(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item {
+            RecognitionToolbar(
+                onScreenshot = { launchRecognition(context, RecognitionMode.SCREENSHOT) },
+                onText = { launchRecognition(context, RecognitionMode.TEXT) },
+                onVoice = { launchRecognition(context, RecognitionMode.VOICE) }
+            )
+        }
+        item {
+            ShareScamInfoBanner(onClick = { /* TODO: 詐騙資訊分享 — 之後實作 */ })
+        }
         item { Header(state) }
 
         if (state.errorMessage != null) {
@@ -149,12 +170,6 @@ fun ScamInfoScreen(
 @Composable
 private fun Header(state: ScamInfoState) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            text = "反詐專區",
-            color = WarningRed,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
         Text(
             text = "整合全台常見詐騙手法與通報管道。遇到可疑情況，請立即撥打 165。",
             color = TextSecondary,
@@ -343,6 +358,10 @@ private fun TacticCard(tactic: ScamTactic, expanded: Boolean, onToggle: () -> Un
         ScamSeverity.HIGH -> AlertYellow
         ScamSeverity.MEDIUM -> DividerGray
     }
+    val context = LocalContext.current
+    val imageModel = remember(tactic.imageUrl, tactic.imageAsset) { tacticImageModel(tactic) }
+    var showFullscreen by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -392,6 +411,13 @@ private fun TacticCard(tactic: ScamTactic, expanded: Boolean, onToggle: () -> Un
             }
             AnimatedVisibility(visible = expanded) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (imageModel != null) {
+                        TacticThumbnail(
+                            model = imageModel,
+                            contentDescription = tactic.title,
+                            onClick = { showFullscreen = true }
+                        )
+                    }
                     if (tactic.redFlags.isNotEmpty()) {
                         Text(
                             text = "辨識特徵",
@@ -418,10 +444,64 @@ private fun TacticCard(tactic: ScamTactic, expanded: Boolean, onToggle: () -> Un
                         color = TextPrimary,
                         style = MaterialTheme.typography.bodyMedium
                     )
+                    if (tactic.sourceUrl != null) {
+                        SourceLinkRow(url = tactic.sourceUrl) {
+                            openExternalUrl(context, tactic.sourceUrl)
+                        }
+                    }
                 }
             }
         }
     }
+
+    if (showFullscreen && imageModel != null) {
+        FullscreenImageDialog(
+            model = imageModel,
+            contentDescription = tactic.title,
+            onDismiss = { showFullscreen = false }
+        )
+    }
+}
+
+@Composable
+private fun SourceLinkRow(url: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+            contentDescription = null,
+            tint = WarningRedLight
+        )
+        Text(
+            text = "查看文章來源",
+            color = WarningRedLight,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            text = url,
+            color = TextDisabled,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false)
+        )
+    }
+}
+
+private fun openExternalUrl(context: android.content.Context, url: String) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(intent) }
+        .onFailure { e ->
+            if (e !is ActivityNotFoundException) throw e
+        }
 }
 
 @Composable
@@ -470,6 +550,123 @@ private fun FooterDisclaimer(notice: String, source: String) {
             Text(text = "資料來源：$source", color = TextDisabled, style = MaterialTheme.typography.bodySmall)
         }
     }
+}
+
+@Composable
+private fun RecognitionToolbar(
+    onScreenshot: () -> Unit,
+    onText: () -> Unit,
+    onVoice: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        RecognitionButton(
+            icon = Icons.Filled.Image,
+            label = "截圖辨識",
+            onClick = onScreenshot,
+            modifier = Modifier.weight(1f)
+        )
+        RecognitionButton(
+            icon = Icons.Filled.TextFields,
+            label = "文字辨識",
+            onClick = onText,
+            modifier = Modifier.weight(1f)
+        )
+        RecognitionButton(
+            icon = Icons.Filled.Mic,
+            label = "語音辨識",
+            onClick = onVoice,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun RecognitionButton(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .height(84.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDim),
+        border = BorderStroke(1.dp, WarningRed)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = WarningRed,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = label,
+                color = TextPrimary,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun ShareScamInfoBanner(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDim),
+        border = BorderStroke(1.dp, AlertYellow)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Share,
+                contentDescription = null,
+                tint = AlertYellow,
+                modifier = Modifier.size(22.dp)
+            )
+            Text(
+                text = "詐騙資訊分享",
+                color = TextPrimary,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = TextSecondary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+private fun launchRecognition(context: android.content.Context, mode: RecognitionMode) {
+    val intent = RecognitionActivity.intent(context, mode)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(intent) }
 }
 
 private fun openChannel(context: android.content.Context, channel: EmergencyChannel) {

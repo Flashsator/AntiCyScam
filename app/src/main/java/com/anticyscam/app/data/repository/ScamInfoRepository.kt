@@ -8,6 +8,9 @@ import com.anticyscam.app.domain.model.ScamCatalog
 import com.anticyscam.app.domain.model.ScamCategory
 import com.anticyscam.app.domain.model.ScamSeverity
 import com.anticyscam.app.domain.model.ScamTactic
+import com.anticyscam.app.domain.model.SuspiciousAliasType
+import com.anticyscam.app.domain.model.SuspiciousName
+import com.anticyscam.app.domain.model.WarnedAccount
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -58,7 +61,9 @@ class ScamInfoRepository @Inject constructor(
         val notice: String = "",
         val channels: List<ChannelDto> = emptyList(),
         val categories: List<CategoryDto> = emptyList(),
-        val tactics: List<TacticDto> = emptyList()
+        val tactics: List<TacticDto> = emptyList(),
+        val suspiciousNames: List<SuspiciousNameDto> = emptyList(),
+        val warnedAccounts: List<WarnedAccountDto> = emptyList()
     ) {
         fun toDomain(): ScamCatalog = ScamCatalog(
             version = version,
@@ -67,7 +72,9 @@ class ScamInfoRepository @Inject constructor(
             notice = notice,
             channels = channels.map(ChannelDto::toDomain),
             categories = categories.map(CategoryDto::toDomain),
-            tactics = tactics.map(TacticDto::toDomain)
+            tactics = tactics.map(TacticDto::toDomain),
+            suspiciousNames = suspiciousNames.mapNotNull(SuspiciousNameDto::toDomainOrNull),
+            warnedAccounts = warnedAccounts.mapNotNull(WarnedAccountDto::toDomainOrNull)
         )
     }
 
@@ -112,7 +119,10 @@ class ScamInfoRepository @Inject constructor(
         val tags: List<String> = emptyList(),
         val description: String,
         val redFlags: List<String> = emptyList(),
-        val protection: String
+        val protection: String,
+        val imageUrl: String? = null,
+        val imageAsset: String? = null,
+        val sourceUrl: String? = null
     ) {
         fun toDomain(): ScamTactic = ScamTactic(
             id = id,
@@ -122,12 +132,59 @@ class ScamInfoRepository @Inject constructor(
             tags = tags,
             description = description,
             redFlags = redFlags,
-            protection = protection
+            protection = protection,
+            imageUrl = imageUrl?.takeIf { it.isNotBlank() },
+            imageAsset = imageAsset?.takeIf { it.isNotBlank() },
+            sourceUrl = sourceUrl?.takeIf { it.isNotBlank() }
         )
+    }
+
+    @Serializable
+    private data class SuspiciousNameDto(
+        val name: String,
+        val aliasType: String = "OTHER",
+        val source: String = "",
+        val reportedDate: String = "",
+        val note: String = ""
+    ) {
+        fun toDomainOrNull(): SuspiciousName? {
+            val cleanName = name.trim()
+            if (cleanName.isEmpty()) return null
+            return SuspiciousName(
+                name = cleanName,
+                aliasType = parseEnum(aliasType, SuspiciousAliasType.OTHER),
+                source = source,
+                reportedDate = reportedDate,
+                note = note
+            )
+        }
+    }
+
+    @Serializable
+    private data class WarnedAccountDto(
+        val account: String,
+        val bank: String = "",
+        val source: String = "",
+        val reportedDate: String = "",
+        val note: String = ""
+    ) {
+        fun toDomainOrNull(): WarnedAccount? {
+            val digits = account.filter(Char::isDigit)
+            if (digits.length !in MIN_ACCOUNT_DIGITS..MAX_ACCOUNT_DIGITS) return null
+            return WarnedAccount(
+                account = digits,
+                bank = bank,
+                source = source,
+                reportedDate = reportedDate,
+                note = note
+            )
+        }
     }
 
     private companion object {
         const val ASSET_PATH = "scam_catalog.json"
+        const val MIN_ACCOUNT_DIGITS = 8
+        const val MAX_ACCOUNT_DIGITS = 16
 
         inline fun <reified E : Enum<E>> parseEnum(raw: String, default: E): E =
             runCatching { enumValueOf<E>(raw.uppercase()) }.getOrDefault(default)
