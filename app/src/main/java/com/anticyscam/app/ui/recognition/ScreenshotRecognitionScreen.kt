@@ -28,16 +28,18 @@ import androidx.compose.ui.unit.dp
 import com.anticyscam.app.ui.theme.WarningRed
 import com.anticyscam.app.ui.theme.WarningRedLight
 
+private const val MAX_PICK_IMAGES = 6
+
 @Composable
 fun ScreenshotRecognitionScreen(
     errorMessage: String?,
-    onPicked: (Uri) -> Unit
+    onPicked: (List<Uri>) -> Unit
 ) {
-    val pickImage = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
-            onPicked(uri)
+    val pickImages = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(MAX_PICK_IMAGES)
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            onPicked(uris)
         }
     }
 
@@ -49,12 +51,12 @@ fun ScreenshotRecognitionScreen(
     ) {
         IntroCard(
             title = "圖片辨識",
-            body = "選擇可疑的對話截圖、簡訊截圖、社群貼文截圖，App 會抓出圖片裡的中文字並比對詐騙資料庫。\n\n🔒 完全離線辨識，圖片不會上傳。"
+            body = "選擇可疑的對話截圖、簡訊截圖、社群貼文截圖，App 會抓出圖片裡的中文字並比對詐騙資料庫。\n\n一次最多 ${MAX_PICK_IMAGES} 張，多張會合併成一段文字一起判讀，適合長對話被分多張截圖的情境。\n\n🔒 完全離線辨識，圖片不會上傳。"
         )
 
         Button(
             onClick = {
-                pickImage.launch(
+                pickImages.launch(
                     PickVisualMediaRequest(
                         ActivityResultContracts.PickVisualMedia.ImageOnly
                     )
@@ -95,6 +97,7 @@ fun ScreenshotRecognitionScreen(
             tips = listOf(
                 "建議使用清晰、文字不被裁切的整張對話截圖。",
                 "支援繁體與簡體中文，無法辨識手寫字。",
+                "可一次選 1 ~ ${MAX_PICK_IMAGES} 張，多張會合併判讀。",
                 "辨識完文字後仍會比對詐騙資料庫並給出風險等級。"
             )
         )

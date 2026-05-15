@@ -121,14 +121,14 @@ class RecognitionViewModel @Inject constructor(
     }
 
     /**
-     * Entry from in-app Photo Picker. The OCR runs in [viewModelScope] so it
-     * survives the input screen unmounting when phase transitions to
-     * PROCESSING — previously the work was hosted in a LaunchedEffect on
-     * ScreenshotRecognitionScreen and got cancelled the moment we entered
-     * PROCESSING, leaving the UI stuck.
+     * Entry from in-app Photo Picker. Accepts 1..N images so a long
+     * conversation that the user had to split into several screenshots can be
+     * OCR'd in one go and analyzed as a single document. OCR runs in
+     * [viewModelScope] so it survives the input screen unmounting when phase
+     * transitions to PROCESSING.
      */
-    fun runScreenshot(uri: Uri) {
-        runOcrPipeline(uri)
+    fun runScreenshot(uris: List<Uri>) {
+        runOcrPipeline(uris)
     }
 
     /**
@@ -139,31 +139,41 @@ class RecognitionViewModel @Inject constructor(
         if (shareHandled) return
         shareHandled = true
         setMode(RecognitionMode.SCREENSHOT)
-        runOcrPipeline(uri)
+        runOcrPipeline(listOf(uri))
     }
 
-    private fun runOcrPipeline(uri: Uri) {
+    private fun runOcrPipeline(uris: List<Uri>) {
+        if (uris.isEmpty()) return
         viewModelScope.launch {
-            _state.update {
-                it.copy(
-                    phase = Phase.PROCESSING,
-                    statusMessage = "辨識圖片文字中…",
-                    errorMessage = null
+            val total = uris.size
+            val texts = mutableListOf<String>()
+            uris.forEachIndexed { index, uri ->
+                _state.update {
+                    it.copy(
+                        phase = Phase.PROCESSING,
+                        statusMessage = if (total == 1) "辨識圖片文字中…"
+                        else "辨識圖片文字中（${index + 1}/$total）…",
+                        errorMessage = null
+                    )
+                }
+                val outcome = runCatching { OcrEngine.recognize(appContext, uri) }
+                outcome.fold(
+                    onSuccess = { text -> if (text.isNotBlank()) texts += text },
+                    onFailure = { e ->
+                        setError(
+                            if (total == 1) "圖片辨識失敗：${e.message ?: "未知錯誤"}"
+                            else "圖片辨識失敗（第 ${index + 1} 張）：${e.message ?: "未知錯誤"}"
+                        )
+                        return@launch
+                    }
                 )
             }
-            val outcome = runCatching { OcrEngine.recognize(appContext, uri) }
-            outcome.fold(
-                onSuccess = { text ->
-                    if (text.isBlank()) {
-                        setError("圖片中沒有偵測到文字，請改用文字模式手動輸入。")
-                    } else {
-                        analyze(text)
-                    }
-                },
-                onFailure = { e ->
-                    setError("圖片辨識失敗：${e.message ?: "未知錯誤"}")
-                }
-            )
+            val combined = texts.joinToString(separator = "\n\n---\n\n")
+            if (combined.isBlank()) {
+                setError("圖片中沒有偵測到文字，請改用文字模式手動輸入。")
+            } else {
+                analyze(combined)
+            }
         }
     }
 
