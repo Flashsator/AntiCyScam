@@ -19,14 +19,19 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Loads the bundled scam catalog (`assets/scam_catalog.json`) on first access
- * and caches the parsed result in memory. The asset is the only data source —
- * no network calls. A future GitHub Actions cron is expected to replace the
- * JSON in-tree, and the next release will pick up the new content.
+ * Loads the scam catalog with a two-tier source:
+ *   1. `filesDir/scam_catalog.json` — written by [CatalogUpdateChecker] after
+ *      the user accepts an in-app update prompt. Takes precedence when present.
+ *   2. `assets/scam_catalog.json` — baseline shipped in the APK; used on a
+ *      fresh install or when no override has been downloaded.
+ *
+ * The parsed catalog is cached in memory. [invalidate] forces a re-read after
+ * a successful download so the new content surfaces without an app restart.
  */
 @Singleton
 class ScamInfoRepository @Inject constructor(
@@ -47,8 +52,18 @@ class ScamInfoRepository @Inject constructor(
         }
     }
 
+    suspend fun invalidate() {
+        mutex.withLock { cached = null }
+    }
+
     private suspend fun parse(): ScamCatalog = withContext(Dispatchers.IO) {
-        val raw = context.assets.open(ASSET_PATH).bufferedReader(Charsets.UTF_8).use { it.readText() }
+        val override = File(context.filesDir, OVERRIDE_FILE)
+        val raw = if (override.exists() && override.length() > 0L) {
+            runCatching { override.readText(Charsets.UTF_8) }
+                .getOrElse { context.assets.open(ASSET_PATH).bufferedReader(Charsets.UTF_8).use { it.readText() } }
+        } else {
+            context.assets.open(ASSET_PATH).bufferedReader(Charsets.UTF_8).use { it.readText() }
+        }
         val dto = json.decodeFromString(CatalogDto.serializer(), raw)
         dto.toDomain()
     }
@@ -183,6 +198,7 @@ class ScamInfoRepository @Inject constructor(
 
     private companion object {
         const val ASSET_PATH = "scam_catalog.json"
+        const val OVERRIDE_FILE = "scam_catalog.json"
         const val MIN_ACCOUNT_DIGITS = 8
         const val MAX_ACCOUNT_DIGITS = 16
 

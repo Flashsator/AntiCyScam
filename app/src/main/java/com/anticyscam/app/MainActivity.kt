@@ -18,8 +18,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import com.anticyscam.app.data.catalog.CatalogUpdateChecker
 import com.anticyscam.app.data.prefs.AntiScamClock
 import com.anticyscam.app.service.AntiScamForegroundService
+import com.anticyscam.app.ui.catalog.CatalogUpdateDialog
 import com.anticyscam.app.ui.gate.AccessibilityGateViewModel
 import com.anticyscam.app.ui.main.MainScreen
 import com.anticyscam.app.ui.theme.AntiCyScamTheme
@@ -48,6 +50,8 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var clock: AntiScamClock
 
+    @Inject lateinit var catalogUpdateChecker: CatalogUpdateChecker
+
     private val requestNotificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {
@@ -62,10 +66,12 @@ class MainActivity : ComponentActivity() {
         // moving the system clock forward can't free a fresh account.
         clock.incrementOpenCount()
         maybeRequestPostNotificationsPermission()
+        catalogUpdateChecker.maybeCheck()
         enableEdgeToEdge()
         setContent {
             AntiCyScamTheme {
                 val state by gateViewModel.state.collectAsState()
+                val catalogState by catalogUpdateChecker.state.collectAsState()
                 // Start/stop the foreground service from the observed gate
                 // state. Requirement #4: only show "防詐器保護中" notification
                 // when all three requirements are satisfied.
@@ -86,6 +92,12 @@ class MainActivity : ComponentActivity() {
                 ) {
                     MainScreen()
                 }
+                CatalogUpdateDialog(
+                    state = catalogState,
+                    onAccept = { catalogUpdateChecker.accept() },
+                    onDismiss = { version -> catalogUpdateChecker.dismiss(version) },
+                    onClose = { catalogUpdateChecker.clearTerminalState() }
+                )
             }
         }
     }
