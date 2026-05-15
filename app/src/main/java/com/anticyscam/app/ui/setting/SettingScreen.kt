@@ -65,6 +65,16 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+// File-level allocations reused by every Card in this screen — kept out of
+// the Composables so LazyColumn item composition doesn't repeatedly build
+// identical Shape/BorderStroke instances. Mirrors the scroll-perf pattern
+// applied to TransferAccountCard.
+private val CardShape = RoundedCornerShape(12.dp)
+private val DividerCardBorder = BorderStroke(1.dp, DividerGray)
+private val AlertCardBorder = BorderStroke(1.dp, AlertYellow)
+private val DangerCardBorder = BorderStroke(1.dp, WarningRed)
+private val ButtonShape = RoundedCornerShape(8.dp)
+
 /**
  * 設定頁 — 顯示防詐器目前狀態與資料管理。
  *
@@ -198,11 +208,12 @@ private fun ProtectionStatusCard(
 ) {
     val allOn = a11yEnabled && deviceAdminActive && notificationsEnabled && batteryIgnored
     val borderColor = if (allOn) SuccessGreen else AlertYellow
+    val border = remember(borderColor) { BorderStroke(1.dp, borderColor) }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = SurfaceDim),
-        border = BorderStroke(1.dp, borderColor)
+        border = border
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -303,9 +314,9 @@ private fun ProtectionFeatureRow(
 private fun StatsCard(boundAppCount: Int, transferAccountCount: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = SurfaceDim),
-        border = BorderStroke(1.dp, DividerGray)
+        border = DividerCardBorder
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -344,9 +355,9 @@ private fun DataSourceCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = SurfaceDim),
-        border = BorderStroke(1.dp, DividerGray)
+        border = DividerCardBorder
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -439,9 +450,9 @@ private fun OfficialSourceRow(
 private fun HotlineCard(onDial: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = SurfaceDim),
-        border = BorderStroke(1.dp, AlertYellow)
+        border = AlertCardBorder
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -470,8 +481,8 @@ private fun HotlineCard(onDial: () -> Unit) {
             OutlinedButton(
                 onClick = onDial,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.dp, AlertYellow),
+                shape = ButtonShape,
+                border = AlertCardBorder,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = AlertYellow)
             ) {
                 Text(text = "撥打 165")
@@ -484,9 +495,9 @@ private fun HotlineCard(onDial: () -> Unit) {
 private fun DangerZoneCard(onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = SurfaceDim),
-        border = BorderStroke(1.dp, WarningRed)
+        border = DangerCardBorder
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -515,7 +526,7 @@ private fun DangerZoneCard(onClick: () -> Unit) {
             Button(
                 onClick = onClick,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
+                shape = ButtonShape,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = WarningRed,
                     contentColor = TextPrimary
@@ -536,9 +547,9 @@ private fun DangerZoneCard(onClick: () -> Unit) {
 private fun DebugZoneCard(onResetCatalog: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = SurfaceDim),
-        border = BorderStroke(1.dp, AlertYellow)
+        border = AlertCardBorder
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -567,8 +578,8 @@ private fun DebugZoneCard(onResetCatalog: () -> Unit) {
             OutlinedButton(
                 onClick = onResetCatalog,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.dp, AlertYellow),
+                shape = ButtonShape,
+                border = AlertCardBorder,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = AlertYellow)
             ) {
                 Text(text = "重設更新檢查狀態")
@@ -581,9 +592,9 @@ private fun DebugZoneCard(onResetCatalog: () -> Unit) {
 private fun AboutCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = SurfaceDim),
-        border = BorderStroke(1.dp, DividerGray)
+        border = DividerCardBorder
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -637,11 +648,12 @@ private fun DiagnosticCard(
 ) {
     val allHealthy = serviceAlive && overlayGranted
     val borderColor = if (allHealthy) SuccessGreen else AlertYellow
+    val border = remember(borderColor) { BorderStroke(1.dp, borderColor) }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = SurfaceDim),
-        border = BorderStroke(1.dp, borderColor)
+        border = border
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -702,8 +714,8 @@ private fun DiagnosticCard(
             OutlinedButton(
                 onClick = onFireTestWarning,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.dp, AlertYellow),
+                shape = ButtonShape,
+                border = AlertCardBorder,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = AlertYellow)
             ) {
                 Text(text = "測試警告畫面")

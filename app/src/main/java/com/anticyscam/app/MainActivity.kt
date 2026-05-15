@@ -10,7 +10,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
@@ -85,9 +84,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 Surface(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(SurfaceBlack),
+                    modifier = Modifier.fillMaxSize(),
                     color = SurfaceBlack
                 ) {
                     MainScreen()
