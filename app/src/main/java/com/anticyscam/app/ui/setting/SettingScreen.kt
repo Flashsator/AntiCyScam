@@ -17,11 +17,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Feedback
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -72,7 +71,6 @@ import java.util.Locale
 private val CardShape = RoundedCornerShape(12.dp)
 private val DividerCardBorder = BorderStroke(1.dp, DividerGray)
 private val AlertCardBorder = BorderStroke(1.dp, AlertYellow)
-private val DangerCardBorder = BorderStroke(1.dp, WarningRed)
 private val ButtonShape = RoundedCornerShape(8.dp)
 
 /**
@@ -82,8 +80,7 @@ private val ButtonShape = RoundedCornerShape(8.dp)
  *  1. 無障礙服務狀態（onResume 重新檢查；未啟用時提供前往系統設定的按鈕）
  *  2. 統計：已綁定 App 數 / 已建立轉帳帳號數
  *  3. 165 反詐騙專線（撥號 Intent）
- *  4. 危險操作：清除所有資料（含確認對話框）
- *  5. 關於：版本資訊
+ *  4. 關於：版本資訊
  */
 @Composable
 fun SettingScreen() {
@@ -91,14 +88,11 @@ fun SettingScreen() {
     val status by viewModel.status.collectAsState()
     val diagnostic by viewModel.diagnostic.collectAsState()
     val serviceAlive by viewModel.accessibilityServiceAlive.collectAsState()
-    val pendingClear by viewModel.pendingClear.collectAsState()
     val catalogMeta by viewModel.catalogMeta.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-
-    val clearedMsg = "已清除所有資料"
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -163,7 +157,7 @@ fun SettingScreen() {
                 HotlineCard(onDial = { dial165(context) })
             }
             item {
-                DangerZoneCard(onClick = viewModel::requestClearAll)
+                FeedbackCard(onClick = { /* TODO: 接意見回饋送出邏輯 */ })
             }
             if (BuildConfig.DEBUG) {
                 item {
@@ -181,17 +175,6 @@ fun SettingScreen() {
                 AboutCard()
             }
         }
-    }
-
-    if (pendingClear) {
-        ClearConfirmDialog(
-            onCancel = viewModel::cancelClearAll,
-            onConfirm = {
-                viewModel.confirmClearAll {
-                    scope.launch { snackbarHostState.showSnackbar(clearedMsg) }
-                }
-            }
-        )
     }
 }
 
@@ -492,12 +475,12 @@ private fun HotlineCard(onDial: () -> Unit) {
 }
 
 @Composable
-private fun DangerZoneCard(onClick: () -> Unit) {
+private fun FeedbackCard(onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = SurfaceDim),
-        border = DangerCardBorder
+        border = AlertCardBorder
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -508,31 +491,29 @@ private fun DangerZoneCard(onClick: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Filled.DeleteForever,
+                    imageVector = Icons.Filled.Feedback,
                     contentDescription = null,
-                    tint = WarningRed
+                    tint = AlertYellow
                 )
                 Text(
-                    text = "危險區",
-                    color = WarningRed,
+                    text = "意見回饋",
+                    color = AlertYellow,
                     style = MaterialTheme.typography.titleMedium
                 )
             }
             Text(
-                text = "清除所有資料：移除所有已綁定 App 與所有新增的轉帳帳號（保留預設「臨時用」）。",
+                text = "回報誤判、想法或遇到的問題，幫助我們改善這個 App。",
                 color = TextSecondary,
                 style = MaterialTheme.typography.bodyMedium
             )
-            Button(
+            OutlinedButton(
                 onClick = onClick,
                 modifier = Modifier.fillMaxWidth(),
                 shape = ButtonShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = WarningRed,
-                    contentColor = TextPrimary
-                )
+                border = AlertCardBorder,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = AlertYellow)
             ) {
-                Text(text = "清除所有資料")
+                Text(text = "提供意見")
             }
         }
     }
@@ -609,33 +590,6 @@ private fun AboutCard() {
             StatsRow(label = "版本", value = BuildConfig.VERSION_NAME)
         }
     }
-}
-
-@Composable
-private fun ClearConfirmDialog(onCancel: () -> Unit, onConfirm: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onCancel,
-        containerColor = SurfaceDim,
-        title = {
-            Text(text = "確認清除所有資料？", color = WarningRed)
-        },
-        text = {
-            Text(
-                text = "此操作無法復原。所有已綁定的 App 與所有自訂轉帳帳號將被刪除。",
-                color = TextSecondary
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(text = "確認清除", color = WarningRed)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onCancel) {
-                Text(text = stringResource(R.string.transfer_action_cancel), color = TextPrimary)
-            }
-        }
-    )
 }
 
 @Composable

@@ -9,7 +9,6 @@ import com.anticyscam.app.data.repository.BoundAppRepository
 import com.anticyscam.app.data.repository.ScamInfoRepository
 import com.anticyscam.app.data.repository.TransferAccountRepository
 import com.anticyscam.app.service.AntiScamAccessibilityService
-import com.anticyscam.app.service.AuthorizedLaunchTracker
 import com.anticyscam.app.service.ForegroundAppGuard
 import com.anticyscam.app.ui.warning.BlockingWarningActivity
 import com.anticyscam.app.utils.AccessibilityChecker
@@ -34,15 +33,12 @@ import javax.inject.Inject
  *    refreshed via [refreshAccessibilityStatus] because there is no Android
  *    callback for "user toggled our service in system settings" — we re-read
  *    on resume.
- *  - [pendingClear] surfaces a one-shot confirmation flag for the destructive
- *    "clear all data" action.
  */
 @HiltViewModel
 class SettingViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val boundAppRepository: BoundAppRepository,
     private val transferAccountRepository: TransferAccountRepository,
-    private val authorizedLaunchTracker: AuthorizedLaunchTracker,
     private val foregroundAppGuard: ForegroundAppGuard,
     private val scamInfoRepository: ScamInfoRepository,
     private val catalogUpdateChecker: CatalogUpdateChecker
@@ -100,9 +96,6 @@ class SettingViewModel @Inject constructor(
 
     /** Decision counters + last event from [ForegroundAppGuard]. */
     val diagnostic: StateFlow<ForegroundAppGuard.Diagnostic> = foregroundAppGuard.diagnostic
-
-    private val _pendingClear = MutableStateFlow(false)
-    val pendingClear: StateFlow<Boolean> = _pendingClear.asStateFlow()
 
     private val _catalogMeta = MutableStateFlow(CatalogMeta())
     val catalogMeta: StateFlow<CatalogMeta> = _catalogMeta.asStateFlow()
@@ -173,29 +166,6 @@ class SettingViewModel @Inject constructor(
         runCatching { appContext.startActivity(intent) }
     }
 
-    fun requestClearAll() {
-        _pendingClear.value = true
-    }
-
-    fun cancelClearAll() {
-        _pendingClear.value = false
-    }
-
-    /**
-     * Wipes user-owned data: bound apps + non-default transfer accounts.
-     * The default "臨時用" is re-seeded by [TransferAccountViewModel.init]
-     * on the next entry to the main screen.
-     */
-    fun confirmClearAll(onDone: () -> Unit) {
-        viewModelScope.launch {
-            transferAccountRepository.clear()
-            boundAppRepository.clearAll()
-            authorizedLaunchTracker.clearAll()
-            _pendingClear.value = false
-            onDone()
-        }
-    }
-
     /**
      * Debug-only. Wipes catalog-update DataStore + downloaded override file
      * and immediately re-runs the check, so QA can re-trigger the update
@@ -233,11 +203,11 @@ class SettingViewModel @Inject constructor(
             ),
             OfficialSource(
                 label = "內政部警政署 刑事警察局",
-                url = "https://www.cib.gov.tw/"
+                url = "https://www.cib.npa.gov.tw/"
             ),
             OfficialSource(
                 label = "行政院 打詐國家隊",
-                url = "https://www.ey.gov.tw/"
+                url = "https://www.ey.gov.tw/Page/DAD883AAD1555692"
             ),
             OfficialSource(
                 label = "數位發展部",
@@ -252,8 +222,8 @@ class SettingViewModel @Inject constructor(
                 url = "https://www.mjib.gov.tw/"
             ),
             OfficialSource(
-                label = "國家通訊傳播委員會 NCC",
-                url = "https://www.ncc.gov.tw/"
+                label = "NCC 堵詐專區（電信網路面）",
+                url = "https://www.ncc.gov.tw/chncc/app/data/list?id=395"
             )
         )
     }
