@@ -205,9 +205,7 @@ private fun InputBody(
         )
         RecognitionMode.SCREENSHOT -> ScreenshotRecognitionScreen(
             errorMessage = state.errorMessage,
-            onProcessing = viewModel::setProcessing,
-            onError = viewModel::setError,
-            onAnalyze = viewModel::analyze
+            onPicked = viewModel::runScreenshot
         )
         RecognitionMode.VOICE -> VoiceRecognitionScreen(
             errorMessage = state.errorMessage,

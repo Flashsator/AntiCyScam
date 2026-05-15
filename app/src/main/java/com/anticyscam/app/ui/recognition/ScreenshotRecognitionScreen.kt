@@ -21,55 +21,24 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.anticyscam.app.ui.recognition.engine.OcrEngine
 import com.anticyscam.app.ui.theme.WarningRed
 import com.anticyscam.app.ui.theme.WarningRedLight
 
 @Composable
 fun ScreenshotRecognitionScreen(
     errorMessage: String?,
-    onProcessing: (String) -> Unit,
-    onError: (String) -> Unit,
-    onAnalyze: (String) -> Unit
+    onPicked: (Uri) -> Unit
 ) {
-    val context = LocalContext.current
-    var pickedUri by remember { mutableStateOf<Uri?>(null) }
-
     val pickImage = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            pickedUri = uri
+            onPicked(uri)
         }
-    }
-
-    LaunchedEffect(pickedUri) {
-        val uri = pickedUri ?: return@LaunchedEffect
-        onProcessing("辨識圖片文字中…")
-        val outcome = runCatching { OcrEngine.recognize(context, uri) }
-        pickedUri = null
-        outcome.fold(
-            onSuccess = { text ->
-                if (text.isBlank()) {
-                    onError("圖片中沒有偵測到文字，請改用文字模式手動輸入。")
-                } else {
-                    onAnalyze(text)
-                }
-            },
-            onFailure = { e ->
-                onError("圖片辨識失敗：${e.message ?: "未知錯誤"}")
-            }
-        )
     }
 
     Column(

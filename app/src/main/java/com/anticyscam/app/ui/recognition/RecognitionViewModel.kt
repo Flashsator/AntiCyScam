@@ -121,6 +121,17 @@ class RecognitionViewModel @Inject constructor(
     }
 
     /**
+     * Entry from in-app Photo Picker. The OCR runs in [viewModelScope] so it
+     * survives the input screen unmounting when phase transitions to
+     * PROCESSING — previously the work was hosted in a LaunchedEffect on
+     * ScreenshotRecognitionScreen and got cancelled the moment we entered
+     * PROCESSING, leaving the UI stuck.
+     */
+    fun runScreenshot(uri: Uri) {
+        runOcrPipeline(uri)
+    }
+
+    /**
      * Entry from share sheet for image content (screenshot from any app).
      * Runs OCR then detector and ends in PROCESSING -> RESULT phase.
      */
@@ -128,6 +139,10 @@ class RecognitionViewModel @Inject constructor(
         if (shareHandled) return
         shareHandled = true
         setMode(RecognitionMode.SCREENSHOT)
+        runOcrPipeline(uri)
+    }
+
+    private fun runOcrPipeline(uri: Uri) {
         viewModelScope.launch {
             _state.update {
                 it.copy(
