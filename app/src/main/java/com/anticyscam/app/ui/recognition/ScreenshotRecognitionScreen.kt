@@ -48,7 +48,7 @@ fun ScreenshotRecognitionScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         IntroCard(
-            title = "截圖辨識",
+            title = "圖片辨識",
             body = "選擇可疑的對話截圖、簡訊截圖、社群貼文截圖，App 會抓出圖片裡的中文字並比對詐騙資料庫。\n\n🔒 完全離線辨識，圖片不會上傳。"
         )
 

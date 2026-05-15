@@ -136,7 +136,7 @@ private fun RecognitionHost(
     val state by viewModel.state.collectAsState()
     val title = when (state.mode) {
         RecognitionMode.TEXT -> "文字辨識"
-        RecognitionMode.SCREENSHOT -> "截圖辨識"
+        RecognitionMode.SCREENSHOT -> "圖片辨識"
         RecognitionMode.VOICE -> "語音辨識"
     }
     Scaffold(

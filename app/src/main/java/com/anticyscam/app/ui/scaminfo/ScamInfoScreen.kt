@@ -593,7 +593,7 @@ private fun RecognitionToolbar(
     ) {
         RecognitionButton(
             icon = Icons.Filled.Image,
-            label = "截圖辨識",
+            label = "圖片辨識",
             onClick = onScreenshot,
             modifier = Modifier.weight(1f)
         )

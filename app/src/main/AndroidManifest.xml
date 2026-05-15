@@ -97,7 +97,7 @@
             android:launchMode="singleTask"
             android:theme="@style/Theme.AntiCyScam.FullscreenWarning" />
 
-        <!-- 防詐專區 top toolbar → 截圖辨識 / 文字辨識 / 語音辨識 host.
+        <!-- 防詐專區 top toolbar → 圖片辨識 / 文字辨識 / 語音辨識 host.
              Also registered as ACTION_SEND target so users can share suspicious
              content from LINE / FB / Chrome / screenshot apps directly into
              the scam-info recognition flow. -->

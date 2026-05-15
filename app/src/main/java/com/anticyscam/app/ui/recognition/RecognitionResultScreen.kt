@@ -217,7 +217,7 @@ private fun riskCopy(result: RecognitionResult): RiskCopy = when (result.riskLev
 
 private fun modeLabel(mode: RecognitionMode): String = when (mode) {
     RecognitionMode.TEXT -> "文字辨識"
-    RecognitionMode.SCREENSHOT -> "截圖辨識"
+    RecognitionMode.SCREENSHOT -> "圖片辨識"
     RecognitionMode.VOICE -> "語音辨識"
 }
 

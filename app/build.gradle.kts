@@ -106,7 +106,7 @@ dependencies {
     // Serialization (scam-catalog JSON in assets)
     implementation(libs.kotlinx.serialization.json)
 
-    // ML Kit on-device OCR (Chinese, for 截圖辨識)
+    // ML Kit on-device OCR (Chinese, for 圖片辨識)
     implementation(libs.mlkit.text.recognition)
     implementation(libs.mlkit.text.recognition.chinese)
 
