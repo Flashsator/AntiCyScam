@@ -89,6 +89,20 @@ fun CatalogUpdateDialog(
                 TextButton(onClick = onClose) { Text("好") }
             }
         )
+
+        is CatalogUpdateChecker.State.NoUpdate -> AlertDialog(
+            onDismissRequest = onClose,
+            title = { Text("目前已是最新版本") },
+            text = {
+                Text(
+                    "詐騙資料庫版本：v${state.currentVersion}\n稍後我們會持續從 165 反詐騙官網更新。",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = onClose) { Text("好") }
+            }
+        )
     }
 }
 

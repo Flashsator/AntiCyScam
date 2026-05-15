@@ -112,12 +112,21 @@ class CatalogUpdateChecker @Inject constructor(
         }
 
         prefs.markCheckedAt(System.currentTimeMillis())
-        val meta = fetchVersionJson() ?: return
+        val meta = fetchVersionJson()
+        if (meta == null) {
+            // 背景檢查吞掉錯誤；使用者手動觸發時要回饋失敗，才知道按鈕有反應
+            if (force) _state.value = State.Failed("無法連線詐騙資料庫，請確認網路後再試。")
+            return
+        }
 
         val currentVersion = runCatching { repository.load().version }.getOrDefault(0)
-        val dismissed = prefs.dismissed()
-        val threshold = maxOf(currentVersion, dismissed)
-        if (meta.version <= threshold) return
+        // force（使用者按「檢查更新」）時忽略先前的「暫不更新」記錄，
+        // 等於使用者改變主意要重新看一次；自動檢查仍尊重 dismissed
+        val threshold = if (force) currentVersion else maxOf(currentVersion, prefs.dismissed())
+        if (meta.version <= threshold) {
+            if (force) _state.value = State.NoUpdate(currentVersion)
+            return
+        }
 
         _state.value = State.UpdateAvailable(
             remoteVersion = meta.version,
@@ -263,6 +272,8 @@ class CatalogUpdateChecker @Inject constructor(
         data object Downloading : State
         data class Done(val version: Int, val summary: UpdateSummary? = null) : State
         data class Failed(val message: String) : State
+        /** 使用者手動檢查、確認已是最新版時的一次性回饋。 */
+        data class NoUpdate(val currentVersion: Int) : State
     }
 
     /**

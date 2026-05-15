@@ -2,6 +2,7 @@ package com.anticyscam.app.ui.scaminfo
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.anticyscam.app.data.catalog.CatalogUpdateChecker
 import com.anticyscam.app.data.repository.ScamInfoRepository
 import com.anticyscam.app.domain.model.EmergencyChannel
 import com.anticyscam.app.domain.model.ScamCategory
@@ -17,7 +18,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ScamInfoViewModel @Inject constructor(
-    private val repository: ScamInfoRepository
+    private val repository: ScamInfoRepository,
+    private val catalogUpdateChecker: CatalogUpdateChecker
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ScamInfoState())
@@ -73,6 +75,15 @@ class ScamInfoViewModel @Inject constructor(
                 manualCategoryChange = if (startingNewSearch) false else it.manualCategoryChange
             )
         }
+    }
+
+    /**
+     * 使用者手動觸發更新檢查。實際 UI（更新對話框 / 無更新對話框 / 失敗對話框）
+     * 共用 MainActivity 內掛載的 [com.anticyscam.app.ui.catalog.CatalogUpdateDialog]，
+     * 這邊只負責呼叫 checker、結果透過共用的 StateFlow 流到對話框。
+     */
+    fun onCheckCatalogUpdate() {
+        catalogUpdateChecker.forceCheck()
     }
 
     fun onTacticExpanded(tacticId: String) {

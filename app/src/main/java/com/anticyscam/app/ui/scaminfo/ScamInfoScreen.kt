@@ -53,6 +53,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -135,7 +136,7 @@ fun ScamInfoScreen(
         item {
             ShareScamInfoBanner(onClick = { /* TODO: 詐騙資訊分享 — 之後實作 */ })
         }
-        item { Header(state) }
+        item { Header(state, onCheckUpdate = viewModel::onCheckCatalogUpdate) }
 
         if (state.errorMessage != null) {
             item { ErrorBanner(state.errorMessage!!) }
@@ -181,7 +182,7 @@ fun ScamInfoScreen(
 }
 
 @Composable
-private fun Header(state: ScamInfoState) {
+private fun Header(state: ScamInfoState, onCheckUpdate: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             text = "整合全台常見詐騙手法與通報管道。遇到可疑情況，請立即撥打 165。",
@@ -189,11 +190,27 @@ private fun Header(state: ScamInfoState) {
             style = MaterialTheme.typography.bodyMedium
         )
         if (state.lastUpdated.isNotEmpty()) {
-            Text(
-                text = "資料版本 v${state.version}　更新日 ${state.lastUpdated}",
-                color = TextDisabled,
-                style = MaterialTheme.typography.bodySmall
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "資料版本 v${state.version}　更新日 ${state.lastUpdated}",
+                    color = TextDisabled,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(
+                    onClick = onCheckUpdate,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                ) {
+                    Text(
+                        text = "檢查更新",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AlertYellow
+                    )
+                }
+            }
         }
     }
 }
