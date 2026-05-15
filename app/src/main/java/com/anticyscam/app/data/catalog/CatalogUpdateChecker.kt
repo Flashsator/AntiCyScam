@@ -86,6 +86,23 @@ class CatalogUpdateChecker @Inject constructor(
         scope.launch { runDownload(current) }
     }
 
+    /**
+     * Debug-only: wipe DataStore + delete the downloaded override file so the
+     * next check behaves like a fresh install. After clearing, immediately
+     * triggers a forced check so the user sees the update prompt without
+     * waiting for the 24h debounce or having to reinstall the APK.
+     */
+    fun resetForDebug() {
+        scope.launch {
+            prefs.clearAll()
+            runCatching { File(context.filesDir, OVERRIDE_FILE).delete() }
+            runCatching { File(context.filesDir, OVERRIDE_TEMP).delete() }
+            repository.invalidate()
+            _state.value = State.Idle
+            runCheck(force = true)
+        }
+    }
+
     private suspend fun runCheck(force: Boolean) {
         if (!force) {
             val now = System.currentTimeMillis()

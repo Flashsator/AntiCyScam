@@ -155,6 +155,18 @@ fun SettingScreen() {
             item {
                 DangerZoneCard(onClick = viewModel::requestClearAll)
             }
+            if (BuildConfig.DEBUG) {
+                item {
+                    DebugZoneCard(
+                        onResetCatalog = {
+                            viewModel.resetCatalogUpdateStateForDebug()
+                            scope.launch {
+                                snackbarHostState.showSnackbar("已重設更新檢查狀態，正在重新檢查…")
+                            }
+                        }
+                    )
+                }
+            }
             item {
                 AboutCard()
             }
@@ -510,6 +522,56 @@ private fun DangerZoneCard(onClick: () -> Unit) {
                 )
             ) {
                 Text(text = "清除所有資料")
+            }
+        }
+    }
+}
+
+/**
+ * Debug-only card. Lets QA wipe the catalog-update DataStore + downloaded
+ * override so the next check behaves like a fresh install — eliminates the
+ * need to uninstall the APK or wait 24h to re-trigger the prompt.
+ */
+@Composable
+private fun DebugZoneCard(onResetCatalog: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDim),
+        border = BorderStroke(1.dp, AlertYellow)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Warning,
+                    contentDescription = null,
+                    tint = AlertYellow
+                )
+                Text(
+                    text = "Debug 工具",
+                    color = AlertYellow,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            Text(
+                text = "重設更新檢查狀態：清除 24h 防抖、已忽略版本、已套用版本與下載的覆蓋檔，立即重新檢查線上目錄版本。",
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            OutlinedButton(
+                onClick = onResetCatalog,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, AlertYellow),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = AlertYellow)
+            ) {
+                Text(text = "重設更新檢查狀態")
             }
         }
     }

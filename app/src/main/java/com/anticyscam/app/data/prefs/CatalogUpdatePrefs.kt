@@ -52,6 +52,11 @@ class CatalogUpdatePrefs @Inject constructor(
         context.catalogUpdateDataStore.edit { it[KEY_APPLIED_VERSION] = version }
     }
 
+    /** Debug helper: wipe all keys so the next check behaves like a fresh install. */
+    suspend fun clearAll() {
+        context.catalogUpdateDataStore.edit { it.clear() }
+    }
+
     private companion object {
         val KEY_LAST_CHECKED = longPreferencesKey("catalog_last_checked_at")
         val KEY_DISMISSED_VERSION = intPreferencesKey("catalog_dismissed_version")

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.anticyscam.app.data.catalog.CatalogUpdateChecker
 import com.anticyscam.app.data.repository.BoundAppRepository
 import com.anticyscam.app.data.repository.ScamInfoRepository
 import com.anticyscam.app.data.repository.TransferAccountRepository
@@ -43,7 +44,8 @@ class SettingViewModel @Inject constructor(
     private val transferAccountRepository: TransferAccountRepository,
     private val authorizedLaunchTracker: AuthorizedLaunchTracker,
     private val foregroundAppGuard: ForegroundAppGuard,
-    private val scamInfoRepository: ScamInfoRepository
+    private val scamInfoRepository: ScamInfoRepository,
+    private val catalogUpdateChecker: CatalogUpdateChecker
 ) : ViewModel() {
 
     private val accessibilityEnabled = MutableStateFlow(
@@ -187,6 +189,15 @@ class SettingViewModel @Inject constructor(
             _pendingClear.value = false
             onDone()
         }
+    }
+
+    /**
+     * Debug-only. Wipes catalog-update DataStore + downloaded override file
+     * and immediately re-runs the check, so QA can re-trigger the update
+     * dialog without uninstalling the APK or waiting 24h.
+     */
+    fun resetCatalogUpdateStateForDebug() {
+        catalogUpdateChecker.resetForDebug()
     }
 
     data class SettingStatus(
