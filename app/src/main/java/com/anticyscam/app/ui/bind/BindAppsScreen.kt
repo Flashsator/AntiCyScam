@@ -108,7 +108,7 @@ fun BindAppsScreen(onClose: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "勾選您希望防詐器保護的 App（例如網銀、Line）。儲存後，這些 App 只能從防詐器內進入。",
+                        text = "勾選您希望防詐器保護的 App（例如網銀、支付工具）。儲存後，這些 App 只能從防詐器內進入。",
                         color = TextSecondary,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -177,11 +177,6 @@ private fun RecommendationHint() {
         )
         Text(
             text = "・您使用的網銀（CUBE、Richart、行動銀行…）",
-            color = TextSecondary,
-            style = MaterialTheme.typography.bodySmall
-        )
-        Text(
-            text = "・支付工具",
             color = TextSecondary,
             style = MaterialTheme.typography.bodySmall
         )
