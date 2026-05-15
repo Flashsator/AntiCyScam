@@ -108,15 +108,20 @@ class SettingViewModel @Inject constructor(
     val catalogMeta: StateFlow<CatalogMeta> = _catalogMeta.asStateFlow()
 
     init {
+        // 訂閱 repository.catalog — CatalogUpdateChecker 套用新版本後
+        // _catalogMeta 會自動更新，設定頁顯示的版本/日期就不會卡在舊值。
         viewModelScope.launch {
-            runCatching { scamInfoRepository.load() }
-                .onSuccess { catalog ->
-                    _catalogMeta.value = CatalogMeta(
-                        version = catalog.version,
-                        lastUpdated = catalog.lastUpdated,
-                        sources = OFFICIAL_SOURCES
-                    )
+            scamInfoRepository.catalog.collect { catalog ->
+                if (catalog == null) {
+                    runCatching { scamInfoRepository.load() }
+                    return@collect
                 }
+                _catalogMeta.value = CatalogMeta(
+                    version = catalog.version,
+                    lastUpdated = catalog.lastUpdated,
+                    sources = OFFICIAL_SOURCES
+                )
+            }
         }
     }
 

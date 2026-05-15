@@ -13,6 +13,9 @@ import com.anticyscam.app.domain.model.SuspiciousName
 import com.anticyscam.app.domain.model.WarnedAccount
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -43,17 +46,24 @@ class ScamInfoRepository @Inject constructor(
         coerceInputValues = true
     }
     private val mutex = Mutex()
-    @Volatile private var cached: ScamCatalog? = null
+    private val _catalog = MutableStateFlow<ScamCatalog?>(null)
+
+    /**
+     * 觀察 catalog 變化 — null 代表「尚未載入」或「剛被 invalidate、等待下一次 load」。
+     * VM 訂閱這個 Flow 就能在 [CatalogUpdateChecker] 套用新版本後自動拿到新內容，
+     * 不再需要手動 refresh。
+     */
+    val catalog: StateFlow<ScamCatalog?> = _catalog.asStateFlow()
 
     suspend fun load(): ScamCatalog {
-        cached?.let { return it }
+        _catalog.value?.let { return it }
         return mutex.withLock {
-            cached ?: parse().also { cached = it }
+            _catalog.value ?: parse().also { _catalog.value = it }
         }
     }
 
     suspend fun invalidate() {
-        mutex.withLock { cached = null }
+        mutex.withLock { _catalog.value = null }
     }
 
     private suspend fun parse(): ScamCatalog = withContext(Dispatchers.IO) {

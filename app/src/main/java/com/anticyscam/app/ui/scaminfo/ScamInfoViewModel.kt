@@ -24,27 +24,34 @@ class ScamInfoViewModel @Inject constructor(
     val state: StateFlow<ScamInfoState> = _state.asStateFlow()
 
     init {
+        // 訂閱 repository.catalog — CatalogUpdateChecker 套用新版本後會
+        // invalidate() → reload()，VM 就會立刻收到新內容並覆蓋 UI 狀態。
+        // 沒有快取時 (null) 主動觸發一次 load() 把 Flow 推進到第一個值。
         viewModelScope.launch {
-            runCatching { repository.load() }
-                .onSuccess { catalog ->
-                    _state.update {
-                        it.copy(
-                            loading = false,
-                            version = catalog.version,
-                            lastUpdated = catalog.lastUpdated,
-                            source = catalog.source,
-                            notice = catalog.notice,
-                            channels = catalog.channels,
-                            categories = catalog.categories,
-                            allTactics = catalog.tactics.sortedBy { tactic -> tactic.severity.ordinal }
-                        )
-                    }
+            repository.catalog.collect { catalog ->
+                if (catalog == null) {
+                    runCatching { repository.load() }
+                        .onFailure { err ->
+                            _state.update {
+                                it.copy(loading = false, errorMessage = err.message ?: "讀取詐騙資料庫失敗")
+                            }
+                        }
+                    return@collect
                 }
-                .onFailure { err ->
-                    _state.update {
-                        it.copy(loading = false, errorMessage = err.message ?: "讀取詐騙資料庫失敗")
-                    }
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        errorMessage = null,
+                        version = catalog.version,
+                        lastUpdated = catalog.lastUpdated,
+                        source = catalog.source,
+                        notice = catalog.notice,
+                        channels = catalog.channels,
+                        categories = catalog.categories,
+                        allTactics = catalog.tactics.sortedBy { tactic -> tactic.severity.ordinal }
+                    )
                 }
+            }
         }
     }
 
