@@ -28,6 +28,18 @@
     <!-- Vibrate for warning haptics -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Auto-detect end of call so we can offer to transcribe the OEM call recording.
+         Runtime permission; if not granted the detector silently no-ops. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
+    <!-- Read OEM call recording files via MediaStore.
+         Android 13+ split READ_EXTERNAL_STORAGE → READ_MEDIA_*; declare both
+         with maxSdkVersion on the legacy one so older devices still work. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
     <!-- Network access for 防詐專區 article thumbnails (Coil loads imageUrl).
          If a tactic only has a bundled imageAsset, no network is touched. -->
     <uses-permission android:name="android.permission.INTERNET" />

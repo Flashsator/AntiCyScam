@@ -10,14 +10,6 @@
     <!-- Share-sheet label when receiving ACTION_SEND from LINE / FB / Chrome / screenshot apps -->
     <string name="share_recognition_label">分享到防詐器辨識</string>
 
-    <!-- Accessibility gate (Phase 2) -->
-    <string name="gate_title">請啟用無障礙服務</string>
-    <string name="gate_subtitle">防詐器需要無障礙服務才能保護您的轉帳安全</string>
-    <string name="gate_reason">為了在您打開網銀／支付類 App 時提醒您，防詐器必須在「設定 → 無障礙」中啟用。未啟用前無法進入。</string>
-    <string name="gate_open_settings">前往無障礙設定</string>
-    <string name="gate_status_disabled">尚未啟用</string>
-    <string name="gate_status_enabled">已啟用</string>
-
     <!-- Bind / unbind apps (Phase 4) -->
     <string name="bind_apps_button">綁定／解除 APP</string>
 
@@ -74,11 +66,27 @@
     <string name="gate_battery_hint">點下後系統會彈出對話框詢問是否允許「不受電池優化」，請選「允許」</string>
     <string name="gate_action_enable">前往啟用</string>
     <string name="gate_status_on">已啟用</string>
-    <string name="gate_status_off">尚未啟用</string>
     <string name="gate_all_ready_hint">四項全部啟用後，畫面會自動切換為防詐器主功能</string>
     <string name="gate_admin_fallback_hint">此版本系統未提供「啟用裝置管理員」直接入口，請手動點選：設定 → 安全 → 裝置管理員應用程式 → 開啟「防詐器」</string>
     <string name="gate_accessibility_open_hint">若沒看到「防詐器」開關，請在清單中向下捲動找「防詐器保護服務」</string>
     <string name="gate_launch_failed">無法開啟系統設定（%1$s），請手動到 設定 App 內開啟</string>
+
+    <!-- Voice recognition: jump to dialer call-recording settings -->
+    <string name="voice_open_call_recording_settings">前往通話錄音設定</string>
+    <string name="voice_open_call_recording_hint">已開啟通話設定，請在頁面內找「通話錄音」並開啟「全部通話自動錄音」</string>
+    <string name="voice_open_call_recording_fallback_hint">系統未直接提供入口，已開啟電話/設定 App，請依下方各品牌路徑手動進入</string>
+
+    <!-- Voice recognition: auto-detect call end + scan OEM recording -->
+    <string name="voice_autodetect_title">通話結束自動辨識</string>
+    <string name="voice_autodetect_body">啟用後，當您結束通話、且手機本身有開啟「通話自動錄音」時，防詐器會自動偵測剛產生的錄音檔，跳通知讓您一鍵送進辨識。\n\n需要：「電話狀態」+「音檔讀取」權限。權限只用於偵測通話結束時間並讀取錄音檔，全程離線、不會上傳。</string>
+    <string name="voice_autodetect_enable">啟用通話結束自動偵測</string>
+    <string name="voice_autodetect_enabled">已啟用，掛斷後若有錄音檔會自動通知</string>
+    <string name="voice_autodetect_denied_hint">缺少必要權限，請至 設定 → 應用程式 → 防詐器 → 權限 中開啟「電話」與「音樂與音訊」</string>
+
+    <!-- Notification when an OEM call recording is found after call ends -->
+    <string name="notif_channel_call_recording">通話錄音偵測</string>
+    <string name="notif_call_recording_title">偵測到剛才的通話錄音</string>
+    <string name="notif_call_recording_text">點擊即可送進防詐器語音辨識，比對是否為詐騙</string>
 
     <!-- Temp-use stage 1 (green pass-through, PRD § 3.3) -->
     <string name="temp_use_stage1_title">提醒</string>
@@ -88,7 +96,6 @@
     <!-- Temp-use stage 2 (yellow forced calm + 3-checkbox) -->
     <string name="temp_use_stage2_title">第 2 次臨時轉帳警告</string>
     <string name="temp_use_stage2_body">10 分鐘內第 2 次臨時轉帳。\n165 統計：被害人平均損失 78 萬。\n您可能正在被詐騙。</string>
-    <string name="temp_use_stage2_calm_label">冷靜倒數</string>
     <string name="temp_use_stage2_check1">政府/銀行不會要求你匯款給對方</string>
     <string name="temp_use_stage2_check2">政府/銀行不會要求你操作ATM</string>
     <string name="temp_use_stage2_check3">與其事後檢討，不如下方撥打 165</string>
@@ -129,7 +136,6 @@
     <string name="account_status_normal">🟢 常用</string>
     <string name="account_status_cooldown">🟡 冷卻中</string>
     <string name="account_status_dormant">💤 久未使用</string>
-    <string name="account_cooldown_remaining">剩 %1$s</string>
 
     <!-- Dormant verification (90-day reuse) -->
     <string name="dormant_title">確認此帳號仍可信任</string>

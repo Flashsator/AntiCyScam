@@ -1,6 +1,10 @@
 package com.anticyscam.app.ui.recognition
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -17,7 +21,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PhoneInTalk
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -34,11 +41,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import com.anticyscam.app.R
 import com.anticyscam.app.ui.recognition.engine.PcmAudioDecoder
 import com.anticyscam.app.ui.recognition.engine.VoskModelManager
 import com.anticyscam.app.ui.recognition.engine.VoskSttEngine
+import com.anticyscam.app.utils.CallRecordingLauncher
 import com.anticyscam.app.ui.theme.AlertYellow
 import com.anticyscam.app.ui.theme.DividerGray
 import com.anticyscam.app.ui.theme.SurfaceDim
@@ -114,10 +125,12 @@ fun VoiceRecognitionScreen(
     ) {
         IntroCard(
             title = "電話語音辨識",
-            body = "上傳通話錄音檔（M4A / AAC / MP3 / AMR / WAV）。App 會用內建的中文語音辨識把對話轉成文字，再比對詐騙資料庫。\n\n🔒 完全離線運作，不需網路、不會上傳，安裝完即可使用。"
+            body = "上傳通話錄音檔（M4A / AAC / MP3 / AMR / WAV）。App 會用內建的中文語音辨識把對話轉成文字，再比對詐騙資料庫。\n\n⚠️ 通話結束自動偵測功能僅部分機種適用（小米／三星／OPPO／Vivo 等原廠支援自動錄音的機型）。\n\n🔒 完全離線運作，不需網路、不會上傳，安裝完即可使用。"
         )
 
         EnableRecordingHowto()
+
+        AutoDetectCard()
 
         Button(
             onClick = { pickAudio.launch(AUDIO_MIME_TYPES) },
@@ -163,6 +176,10 @@ fun VoiceRecognitionScreen(
 
 @Composable
 private fun EnableRecordingHowto() {
+    val context = LocalContext.current
+    val directHint = stringResource(R.string.voice_open_call_recording_hint)
+    val fallbackHint = stringResource(R.string.voice_open_call_recording_fallback_hint)
+    val launchFailedTemplate = stringResource(R.string.gate_launch_failed)
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -194,6 +211,44 @@ private fun EnableRecordingHowto() {
                 color = TextSecondary,
                 style = MaterialTheme.typography.bodyMedium
             )
+            Button(
+                onClick = {
+                    val result = CallRecordingLauncher.launch(context)
+                    val msg = when {
+                        !result.launched -> launchFailedTemplate.format(
+                            result.error?.javaClass?.simpleName ?: "Unknown"
+                        )
+                        result.isDirect -> directHint
+                        else -> fallbackHint
+                    }
+                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AlertYellow,
+                    contentColor = Color.Black
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.PhoneInTalk,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    text = stringResource(R.string.voice_open_call_recording_settings),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Text(
+                text = "若按鈕沒帶你到「通話錄音」頁，請依下方各品牌路徑手動進入：",
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodySmall
+            )
             HowtoLine(brand = "小米 / Redmi", path = "電話 → 右上角選單 → 通話設定 → 通話錄音 → 全部通話自動錄音")
             HowtoLine(brand = "三星 Samsung", path = "電話 → 設定 → 錄製通話 → 自動錄製通話")
             HowtoLine(brand = "OPPO / realme", path = "電話 → 右下角更多 → 通話錄音 → 全部通話自動錄音")
@@ -204,6 +259,110 @@ private fun EnableRecordingHowto() {
                 color = TextDisabled,
                 style = MaterialTheme.typography.bodySmall
             )
+        }
+    }
+}
+
+@Composable
+private fun AutoDetectCard() {
+    val context = LocalContext.current
+    val mediaPerm = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+    }
+    val requiredPerms = remember(mediaPerm) {
+        arrayOf(Manifest.permission.READ_PHONE_STATE, mediaPerm)
+    }
+    fun granted(): Boolean = requiredPerms.all { p ->
+        ContextCompat.checkSelfPermission(context, p) == PackageManager.PERMISSION_GRANTED
+    }
+    var allGranted by remember { mutableStateOf(granted()) }
+    val deniedHint = stringResource(R.string.voice_autodetect_denied_hint)
+
+    val permLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val ok = result.values.all { it }
+        allGranted = ok || granted()
+        if (!ok && !allGranted) {
+            Toast.makeText(context, deniedHint, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDim),
+        border = BorderStroke(1.dp, DividerGray)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.AutoMode,
+                    contentDescription = null,
+                    tint = AlertYellow,
+                    modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    text = stringResource(R.string.voice_autodetect_title),
+                    color = AlertYellow,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Text(
+                text = stringResource(R.string.voice_autodetect_body),
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            if (allGranted) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = AlertYellow,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = stringResource(R.string.voice_autodetect_enabled),
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            } else {
+                Button(
+                    onClick = { permLauncher.launch(requiredPerms) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AlertYellow,
+                        contentColor = Color.Black
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.AutoMode,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    Text(
+                        text = stringResource(R.string.voice_autodetect_enable),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
         }
     }
 }

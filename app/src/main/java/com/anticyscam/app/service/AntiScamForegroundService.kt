@@ -47,6 +47,8 @@ class AntiScamForegroundService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var watchdogJob: Job? = null
+    // 通話結束自動偵測 → 掃 OEM 錄音檔 → 通知使用者送進辨識流程
+    private val callRecordingDetector by lazy { CallRecordingDetector(this) }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -59,6 +61,7 @@ class AntiScamForegroundService : Service() {
         startForegroundCompat()
         if (!enforceProtectionState()) return
         startWatchdog()
+        callRecordingDetector.start()
         // Safety-net settle: BootReceiver also does this, but the service is
         // also restarted by Android after process death without a reboot —
         // catching that path is why we settle here too. Cheap when no rows.
@@ -78,6 +81,7 @@ class AntiScamForegroundService : Service() {
 
     override fun onDestroy() {
         watchdogJob?.cancel()
+        callRecordingDetector.destroy()
         scope.cancel()
         super.onDestroy()
     }
@@ -122,6 +126,8 @@ class AntiScamForegroundService : Service() {
                 runCatching {
                     if (!enforceProtectionState()) return@launch
                     refreshNotificationFromStatus()
+                    // 處理使用者後來給/收回 READ_PHONE_STATE / READ_MEDIA_AUDIO 的情況
+                    callRecordingDetector.refreshIfNeeded()
                 }.onFailure { Log.w(TAG, "watchdog tick failed", it) }
             }
         }
