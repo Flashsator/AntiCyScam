@@ -5,16 +5,17 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.compose.compiler)
 }
 
 android {
     namespace = "com.anticyscam.app"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.anticyscam.app"
-        minSdk = 26
-        targetSdk = 34
+        minSdk = 31
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
 
@@ -48,9 +49,6 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
     }
     packaging {
         resources {

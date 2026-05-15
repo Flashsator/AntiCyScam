@@ -1,8 +1,8 @@
 [versions]
-agp = "8.5.2"
-kotlin = "1.9.24"
-ksp = "1.9.24-1.0.20"
-hilt = "2.51.1"
+agp = "8.8.2"
+kotlin = "2.0.21"
+ksp = "2.0.21-1.0.28"
+hilt = "2.52"
 
 kotlinxSerialization = "1.6.3"
 
@@ -13,7 +13,7 @@ androidxNavigation = "2.8.0"
 androidxDataStore = "1.1.1"
 androidxRoom = "2.6.1"
 androidxSecurity = "1.1.0-alpha06"
-androidxComposeBom = "2024.08.00"
+androidxComposeBom = "2024.10.01"
 hiltNavigationCompose = "1.2.0"
 
 coil = "2.7.0"
