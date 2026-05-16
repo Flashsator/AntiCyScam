@@ -111,6 +111,7 @@ class SettingViewModel @Inject constructor(
                 }
                 _catalogMeta.value = CatalogMeta(
                     version = catalog.version,
+                    displayVersion = catalog.displayVersion.ifEmpty { "v${catalog.version}" },
                     lastUpdated = catalog.lastUpdated,
                     sources = OFFICIAL_SOURCES
                 )
@@ -187,6 +188,7 @@ class SettingViewModel @Inject constructor(
 
     data class CatalogMeta(
         val version: Int = 0,
+        val displayVersion: String = "",
         val lastUpdated: String = "",
         val sources: List<OfficialSource> = emptyList()
     )

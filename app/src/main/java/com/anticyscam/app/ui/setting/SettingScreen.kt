@@ -172,7 +172,7 @@ fun SettingScreen() {
                 }
             }
             item {
-                AboutCard()
+                AboutCard(meta = catalogMeta)
             }
         }
     }
@@ -362,7 +362,7 @@ private fun DataSourceCard(
                 )
             }
             if (meta.version > 0 || meta.lastUpdated.isNotEmpty()) {
-                val versionPart = if (meta.version > 0) "資料版本 v${meta.version}" else ""
+                val versionPart = if (meta.version > 0) "資料版本 ${meta.displayVersion}" else ""
                 val datePart = if (meta.lastUpdated.isNotEmpty()) "更新日 ${meta.lastUpdated}" else ""
                 Text(
                     text = listOf(versionPart, datePart).filter { it.isNotEmpty() }.joinToString("　·　"),
@@ -570,7 +570,7 @@ private fun DebugZoneCard(onResetCatalog: () -> Unit) {
 }
 
 @Composable
-private fun AboutCard() {
+private fun AboutCard(meta: SettingViewModel.CatalogMeta) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = CardShape,
@@ -587,7 +587,14 @@ private fun AboutCard() {
                 style = MaterialTheme.typography.titleMedium
             )
             StatsRow(label = "App 名稱", value = stringResource(R.string.app_name))
-            StatsRow(label = "版本", value = BuildConfig.VERSION_NAME)
+            StatsRow(label = "App 版本", value = BuildConfig.VERSION_NAME)
+            if (meta.displayVersion.isNotEmpty()) {
+                StatsRow(label = "詐騙資料庫版本", value = meta.displayVersion)
+            }
+            if (meta.lastUpdated.isNotEmpty()) {
+                StatsRow(label = "資料更新日", value = meta.lastUpdated)
+            }
+            StatsRow(label = "資料處理方式", value = "全程裝置端離線")
         }
     }
 }
