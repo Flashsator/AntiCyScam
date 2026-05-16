@@ -30,6 +30,7 @@
     <string name="transfer_field_name">姓名／用途</string>
     <string name="transfer_field_account">轉帳帳號</string>
     <string name="transfer_field_bank_code">銀行代碼(選填)</string>
+    <string name="transfer_field_bank_code_hint">需填 3 位數字，例 007、012</string>
     <string name="transfer_card_bank_code_prefix">銀行代碼</string>
     <string name="transfer_action_save">儲存</string>
     <string name="transfer_action_cancel">取消</string>

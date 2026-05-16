@@ -65,7 +65,10 @@ class TransferAccountRepository @Inject constructor(
         val trimmedName = name.trim()
         val trimmedAccount = accountNumber.trim()
         val trimmedBankCode = bankCode?.trim()?.ifEmpty { null }
-        if (trimmedName.isEmpty() || trimmedAccount.isEmpty()) {
+        if (trimmedName.isEmpty() || !isValidAccountNumber(trimmedAccount)) {
+            return AddResult.InvalidInput
+        }
+        if (!isValidBankCode(trimmedBankCode)) {
             return AddResult.InvalidInput
         }
         if (dao.count() >= TransferAccount.MAX_ACCOUNTS) {
@@ -135,7 +138,10 @@ class TransferAccountRepository @Inject constructor(
         val trimmedName = newName.trim()
         val trimmedNumber = newAccountNumber.trim()
         val trimmedBankCode = newBankCode?.trim()?.ifEmpty { null }
-        if (trimmedName.isEmpty() || trimmedNumber.isEmpty()) {
+        if (trimmedName.isEmpty() || !isValidAccountNumber(trimmedNumber)) {
+            return AddResult.InvalidInput
+        }
+        if (!isValidBankCode(trimmedBankCode)) {
             return AddResult.InvalidInput
         }
 
@@ -311,6 +317,20 @@ class TransferAccountRepository @Inject constructor(
     fun stateOf(account: TransferAccount, now: NowSnapshot): TransferAccountState =
         TransferAccountSettleEngine.deriveState(account, now)
 
+    /**
+     * 轉帳帳號規範：限純數字、不可為空。UI 端已用數字鍵盤 + filter 擋下，
+     * 這裡是 repository 層的第二道閘，防止非 UI 路徑寫入髒資料。
+     */
+    private fun isValidAccountNumber(value: String): Boolean =
+        value.isNotEmpty() && value.all { it.isDigit() }
+
+    /**
+     * 銀行代碼規範：選填；一旦填寫，必須剛好 [BANK_CODE_LENGTH] 位純數字
+     * （例 007、012）。null 代表使用者未填，視為合規。
+     */
+    private fun isValidBankCode(value: String?): Boolean =
+        value == null || (value.length == BANK_CODE_LENGTH && value.all { it.isDigit() })
+
     sealed interface AddResult {
         data class Success(
             val id: Long,
@@ -327,5 +347,10 @@ class TransferAccountRepository @Inject constructor(
         data object EditsExhausted : AddResult
         /** Row is past the 24h 編輯窗 (Matured / PendingDeletion). */
         data object EditWindowClosed : AddResult
+    }
+
+    private companion object {
+        /** 國內銀行代碼固定 3 位數字。 */
+        const val BANK_CODE_LENGTH = 3
     }
 }

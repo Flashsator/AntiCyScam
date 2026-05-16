@@ -24,6 +24,9 @@ import com.anticyscam.app.ui.theme.SurfaceElevated
 import com.anticyscam.app.ui.theme.TextPrimary
 import com.anticyscam.app.ui.theme.WarningRed
 
+/** 銀行代碼規範長度 — 國內銀行代碼固定 3 位數字（例 007、012）。 */
+private const val BANK_CODE_LENGTH = 3
+
 /**
  * Dialog for adding OR editing a transfer account. Validation is intentionally
  * minimal here — the repository enforces non-empty fields, the 5-row cap, the
@@ -46,8 +49,10 @@ fun AddTransferAccountDialog(
     var name by remember(initialName) { mutableStateOf(initialName) }
     var accountNumber by remember(initialAccountNumber) { mutableStateOf(initialAccountNumber) }
     var bankCode by remember(initialBankCode) { mutableStateOf(initialBankCode) }
-    // 銀行代碼 is optional — only name + account number gate the Save button.
-    val canSave = name.isNotBlank() && accountNumber.isNotBlank()
+    // 轉帳帳號限數字、銀行代碼選填但填了必須剛好 3 位數字。
+    // 不合規範時 isBankCodeValid = false → 鎖住「儲存」不給確認新增。
+    val isBankCodeValid = bankCode.isEmpty() || bankCode.length == BANK_CODE_LENGTH
+    val canSave = name.isNotBlank() && accountNumber.isNotBlank() && isBankCodeValid
     val titleRes = if (isEditMode) R.string.transfer_edit_title else R.string.transfer_add_title
 
     AlertDialog(
@@ -87,9 +92,18 @@ fun AddTransferAccountDialog(
                 )
                 OutlinedTextField(
                     value = bankCode,
-                    onValueChange = { bankCode = it.filter { ch -> ch.isDigit() } },
+                    onValueChange = {
+                        bankCode = it.filter { ch -> ch.isDigit() }.take(BANK_CODE_LENGTH)
+                    },
                     label = { Text(stringResource(R.string.transfer_field_bank_code)) },
                     singleLine = true,
+                    isError = !isBankCodeValid,
+                    supportingText = {
+                        Text(
+                            text = stringResource(R.string.transfer_field_bank_code_hint),
+                            color = if (isBankCodeValid) TextPrimary else WarningRed
+                        )
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
             }
