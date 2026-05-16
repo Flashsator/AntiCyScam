@@ -209,9 +209,7 @@ private fun InputBody(
         )
         RecognitionMode.VOICE -> VoiceRecognitionScreen(
             errorMessage = state.errorMessage,
-            onProcessing = viewModel::setProcessing,
-            onError = viewModel::setError,
-            onAnalyze = viewModel::analyze
+            onPicked = viewModel::runVoice
         )
     }
 }

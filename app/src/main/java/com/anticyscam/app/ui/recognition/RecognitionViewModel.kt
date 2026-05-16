@@ -66,12 +66,6 @@ class RecognitionViewModel @Inject constructor(
         _state.update { it.copy(draftText = text, errorMessage = null) }
     }
 
-    fun setProcessing(status: String) {
-        _state.update {
-            it.copy(phase = Phase.PROCESSING, statusMessage = status, errorMessage = null)
-        }
-    }
-
     fun setError(message: String) {
         _state.update {
             it.copy(phase = Phase.INPUT, errorMessage = message, statusMessage = "")
@@ -178,12 +172,26 @@ class RecognitionViewModel @Inject constructor(
     }
 
     /**
+     * Entry from the in-app audio picker. Runs the Vosk pipeline in
+     * [viewModelScope] so it survives [VoiceRecognitionScreen] unmounting when
+     * phase transitions to PROCESSING — a composable-scoped coroutine would be
+     * cancelled the instant the input screen leaves the composition.
+     */
+    fun runVoice(uri: Uri) {
+        runVoicePipeline(uri)
+    }
+
+    /**
      * Entry from share sheet for audio content (recording-app share).
      */
     fun startVoiceFromShare(uri: Uri) {
         if (shareHandled) return
         shareHandled = true
         setMode(RecognitionMode.VOICE)
+        runVoicePipeline(uri)
+    }
+
+    private fun runVoicePipeline(uri: Uri) {
         viewModelScope.launch {
             _state.update {
                 it.copy(

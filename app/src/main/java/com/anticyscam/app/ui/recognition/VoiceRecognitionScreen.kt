@@ -33,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,9 +45,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.anticyscam.app.R
-import com.anticyscam.app.ui.recognition.engine.PcmAudioDecoder
-import com.anticyscam.app.ui.recognition.engine.VoskModelManager
-import com.anticyscam.app.ui.recognition.engine.VoskSttEngine
 import com.anticyscam.app.utils.CallRecordingLauncher
 import com.anticyscam.app.ui.theme.AlertYellow
 import com.anticyscam.app.ui.theme.DividerGray
@@ -71,49 +67,25 @@ private val AUDIO_MIME_TYPES = arrayOf(
     "audio/x-wav"
 )
 
+/**
+ * 語音辨識輸入畫面。選檔後把 uri 交給 [onPicked]（接到
+ * `RecognitionViewModel.runVoice`），辨識流程一律跑在 viewModelScope。
+ *
+ * 不可在此 composable 內用 LaunchedEffect 跑辨識：流程第一步就會把 phase
+ * 切到 PROCESSING，本畫面隨即離開 composition，composable-scoped 協程會被
+ * 立即取消（"the coroutine scope left the composition"）。
+ */
 @Composable
 fun VoiceRecognitionScreen(
     errorMessage: String?,
-    onProcessing: (String) -> Unit,
-    onError: (String) -> Unit,
-    onAnalyze: (String) -> Unit
+    onPicked: (Uri) -> Unit
 ) {
-    val context = LocalContext.current
-    var pickedUri by remember { mutableStateOf<Uri?>(null) }
-
     val pickAudio = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
-            pickedUri = uri
+            onPicked(uri)
         }
-    }
-
-    LaunchedEffect(pickedUri) {
-        val uri = pickedUri ?: return@LaunchedEffect
-        onProcessing("準備中文語音模型…")
-        val outcome = runCatching {
-            val model = VoskModelManager.ensureModel(context) { phase, _ ->
-                onProcessing(phase)
-            }
-            onProcessing("解碼音檔中…")
-            val pcm = PcmAudioDecoder.decodeToPcm16kMono(context, uri)
-            onProcessing("語音辨識中…（檔案越長越久）")
-            VoskSttEngine.transcribe(model, pcm)
-        }
-        pickedUri = null
-        outcome.fold(
-            onSuccess = { text ->
-                if (text.isBlank()) {
-                    onError("語音中沒有辨識到內容，請確認檔案有清晰人聲。")
-                } else {
-                    onAnalyze(text)
-                }
-            },
-            onFailure = { e ->
-                onError("語音辨識失敗：${e.message ?: "未知錯誤"}")
-            }
-        )
     }
 
     Column(
