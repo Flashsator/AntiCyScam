@@ -134,13 +134,4 @@
 
     <!-- Account status badges (cards) -->
     <string name="account_status_default">預設</string>
-    <string name="account_status_normal">🟢 常用</string>
-    <string name="account_status_cooldown">🟡 冷卻中</string>
-    <string name="account_status_dormant">💤 久未使用</string>
-
-    <!-- Dormant verification (90-day reuse) -->
-    <string name="dormant_title">確認此帳號仍可信任</string>
-    <string name="dormant_body">這筆帳號已超過 90 天未使用。\n為避免被詐騙利用舊帳號，請再次與對方本人確認後再繼續。</string>
-    <string name="dormant_check">我已親自確認對方本人與此帳號</string>
-    <string name="dormant_cta">確認，繼續轉帳</string>
 </resources>

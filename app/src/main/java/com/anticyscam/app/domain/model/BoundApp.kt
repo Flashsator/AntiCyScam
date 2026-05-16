@@ -19,20 +19,7 @@ data class BoundApp(
     val unbindRequestedAtWall: Long? = null,
     val unbindRequestedAtElapsedNanos: Long? = null,
     val accumulatedUnbindMillis: Long = 0L
-) {
-    companion object {
-        /**
-         * Legacy 24h unbind lock from pre-v4 design. Kept as a deprecated
-         * alias for any straggling call sites; new logic should use
-         * [com.anticyscam.app.domain.binding.BindingSettleEngine.MATURATION_MS].
-         */
-        @Deprecated(
-            "Use BindingSettleEngine.MATURATION_MS",
-            ReplaceWith("BindingSettleEngine.MATURATION_MS")
-        )
-        const val UNBIND_LOCK_MS: Long = 24L * 60 * 60 * 1000
-    }
-}
+)
 
 /** UI-friendly bundle of the raw row + its derived state at a snapshot. */
 data class BoundAppWithState(
