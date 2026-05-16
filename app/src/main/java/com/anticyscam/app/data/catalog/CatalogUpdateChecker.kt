@@ -119,19 +119,23 @@ class CatalogUpdateChecker @Inject constructor(
             return
         }
 
-        val currentVersion = runCatching { repository.load().version }.getOrDefault(0)
+        val currentCatalog = runCatching { repository.load() }.getOrNull()
+        val currentVersion = currentCatalog?.version ?: 0
+        val currentDisplayVersion = currentCatalog?.displayVersion.orEmpty()
         // force（使用者按「檢查更新」）時忽略先前的「暫不更新」記錄，
         // 等於使用者改變主意要重新看一次；自動檢查仍尊重 dismissed
         val threshold = if (force) currentVersion else maxOf(currentVersion, prefs.dismissed())
         if (meta.version <= threshold) {
-            if (force) _state.value = State.NoUpdate(currentVersion)
+            if (force) _state.value = State.NoUpdate(currentVersion, currentDisplayVersion)
             return
         }
 
         _state.value = State.UpdateAvailable(
             remoteVersion = meta.version,
+            remoteDisplayVersion = meta.displayVersion,
             sha256 = meta.sha256,
-            currentVersion = currentVersion
+            currentVersion = currentVersion,
+            currentDisplayVersion = currentDisplayVersion
         )
     }
 
@@ -165,7 +169,14 @@ class CatalogUpdateChecker @Inject constructor(
             } else {
                 null
             }
-            _state.value = State.Done(available.remoteVersion, summary)
+            val appliedDisplayVersion = after?.displayVersion
+                ?.takeIf { it.isNotBlank() }
+                ?: available.remoteDisplayVersion
+            _state.value = State.Done(
+                version = available.remoteVersion,
+                displayVersion = appliedDisplayVersion,
+                summary = summary
+            )
         } else {
             _state.value = State.Failed("更新失敗，稍後再試。")
         }
@@ -175,6 +186,8 @@ class CatalogUpdateChecker @Inject constructor(
         UpdateSummary(
             fromVersion = before.version,
             toVersion = after.version,
+            fromDisplayVersion = before.displayVersion,
+            toDisplayVersion = after.displayVersion,
             sections = listOf(
                 sectionDelta("詐騙手法", before.tactics, after.tactics) { it.id },
                 sectionDelta("警示帳號", before.warnedAccounts, after.warnedAccounts) { it.account },
@@ -257,6 +270,7 @@ class CatalogUpdateChecker @Inject constructor(
     @Serializable
     private data class VersionMeta(
         val version: Int,
+        val displayVersion: String = "",
         val sha256: String = "",
         val updatedAt: String = ""
     )
@@ -265,15 +279,24 @@ class CatalogUpdateChecker @Inject constructor(
         data object Idle : State
         data class UpdateAvailable(
             val remoteVersion: Int,
+            val remoteDisplayVersion: String,
             val sha256: String,
-            val currentVersion: Int
+            val currentVersion: Int,
+            val currentDisplayVersion: String
         ) : State
 
         data object Downloading : State
-        data class Done(val version: Int, val summary: UpdateSummary? = null) : State
+        data class Done(
+            val version: Int,
+            val displayVersion: String,
+            val summary: UpdateSummary? = null
+        ) : State
         data class Failed(val message: String) : State
         /** 使用者手動檢查、確認已是最新版時的一次性回饋。 */
-        data class NoUpdate(val currentVersion: Int) : State
+        data class NoUpdate(
+            val currentVersion: Int,
+            val currentDisplayVersion: String
+        ) : State
     }
 
     /**
@@ -292,6 +315,8 @@ class CatalogUpdateChecker @Inject constructor(
     data class UpdateSummary(
         val fromVersion: Int,
         val toVersion: Int,
+        val fromDisplayVersion: String,
+        val toDisplayVersion: String,
         val sections: List<SectionDelta>
     )
 

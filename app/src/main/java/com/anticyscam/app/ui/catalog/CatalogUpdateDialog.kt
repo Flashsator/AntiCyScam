@@ -41,8 +41,8 @@ fun CatalogUpdateDialog(
             title = { Text("詐騙資料庫有新版本") },
             text = {
                 Text(
-                    "目前版本：v${state.currentVersion}\n" +
-                            "最新版本：v${state.remoteVersion}\n\n" +
+                    "目前版本：${versionLabel(state.currentDisplayVersion, state.currentVersion)}\n" +
+                            "最新版本：${versionLabel(state.remoteDisplayVersion, state.remoteVersion)}\n\n" +
                             "更新內容由 GH Actions 每週從 165 反詐騙官網彙整。" +
                             "建議更新以取得最新詐騙手法、可疑帳號與名單。",
                     style = MaterialTheme.typography.bodyMedium
@@ -74,7 +74,7 @@ fun CatalogUpdateDialog(
 
         is CatalogUpdateChecker.State.Done -> AlertDialog(
             onDismissRequest = onClose,
-            title = { Text("已更新到 v${state.version}") },
+            title = { Text("已更新到 ${versionLabel(state.displayVersion, state.version)}") },
             text = { DoneSummaryBody(summary = state.summary) },
             confirmButton = {
                 TextButton(onClick = onClose) { Text("好") }
@@ -95,7 +95,8 @@ fun CatalogUpdateDialog(
             title = { Text("目前已是最新版本") },
             text = {
                 Text(
-                    "詐騙資料庫版本：v${state.currentVersion}\n稍後我們會持續從 165 反詐騙官網更新。",
+                    "詐騙資料庫版本：${versionLabel(state.currentDisplayVersion, state.currentVersion)}\n" +
+                        "稍後我們會持續從 165 反詐騙官網更新。",
                     style = MaterialTheme.typography.bodyMedium
                 )
             },
@@ -122,7 +123,8 @@ private fun DoneSummaryBody(summary: CatalogUpdateChecker.UpdateSummary?) {
         modifier = Modifier.verticalScroll(rememberScrollState())
     ) {
         Text(
-            text = "版本：v${summary.fromVersion} → v${summary.toVersion}",
+            text = "版本：${versionLabel(summary.fromDisplayVersion, summary.fromVersion)} → " +
+                versionLabel(summary.toDisplayVersion, summary.toVersion),
             style = MaterialTheme.typography.bodyMedium
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -146,6 +148,13 @@ private fun DoneSummaryBody(summary: CatalogUpdateChecker.UpdateSummary?) {
         }
     }
 }
+
+/**
+ * 顯示用版號：優先用型錄自帶的 displayVersion（已含 "v" 前綴，如 "v1.0.0"）；
+ * 舊版型錄沒有此欄位時退回機器版號 "v{整數}"。
+ */
+private fun versionLabel(displayVersion: String, code: Int): String =
+    displayVersion.ifBlank { "v$code" }
 
 private fun formatSection(section: CatalogUpdateChecker.SectionDelta): String =
     buildString {

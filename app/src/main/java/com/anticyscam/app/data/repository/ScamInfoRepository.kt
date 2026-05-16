@@ -81,6 +81,7 @@ class ScamInfoRepository @Inject constructor(
     @Serializable
     private data class CatalogDto(
         val version: Int,
+        val displayVersion: String = "",
         val lastUpdated: String,
         val source: String,
         val notice: String = "",
@@ -92,6 +93,7 @@ class ScamInfoRepository @Inject constructor(
     ) {
         fun toDomain(): ScamCatalog = ScamCatalog(
             version = version,
+            displayVersion = displayVersion.trim(),
             lastUpdated = lastUpdated,
             source = source,
             notice = notice,

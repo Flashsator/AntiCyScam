@@ -7,7 +7,19 @@ package com.anticyscam.app.domain.model
  * should be optional and parsed leniently.
  */
 data class ScamCatalog(
+    /**
+     * Machine-facing build number. Monotonically increasing — [CatalogUpdateChecker]
+     * compares this integer to decide whether a newer catalog exists. Never reused
+     * for display; the human-facing label is [displayVersion].
+     */
     val version: Int,
+    /**
+     * Human-facing version shown in 防詐專區 (e.g. "v1.0.0"). Mirrors Android's
+     * versionName↔versionCode split: [version] drives update detection, this
+     * string is purely cosmetic. Empty on legacy catalogs — callers fall back
+     * to "v${version}".
+     */
+    val displayVersion: String = "",
     val lastUpdated: String,
     val source: String,
     val notice: String,

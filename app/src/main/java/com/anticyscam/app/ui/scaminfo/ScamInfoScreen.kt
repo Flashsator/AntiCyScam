@@ -195,7 +195,9 @@ private fun Header(state: ScamInfoState, onCheckUpdate: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "資料版本 v${state.version}　更新日 ${state.lastUpdated}",
+                    // displayVersion 已含 "v" 前綴；舊版型錄沒有此欄位時退回 "v{整數版號}"。
+                    text = "資料版本 ${state.displayVersion.ifBlank { "v${state.version}" }}　" +
+                        "更新日 ${state.lastUpdated}",
                     color = TextDisabled,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f)
