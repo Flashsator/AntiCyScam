@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider paths. Currently only the in-app APK updater needs a
+    shareable URI: AppUpdateChecker downloads the update APK into
+    cacheDir/update/ and hands a content:// URI to the system installer.
+-->
+<paths>
+    <cache-path
+        name="app_updates"
+        path="update/" />
+</paths>

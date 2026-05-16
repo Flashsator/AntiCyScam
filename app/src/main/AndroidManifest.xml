@@ -41,8 +41,13 @@
         android:maxSdkVersion="32" />
 
     <!-- Network access for 防詐專區 article thumbnails (Coil loads imageUrl).
-         If a tactic only has a bundled imageAsset, no network is touched. -->
+         If a tactic only has a bundled imageAsset, no network is touched.
+         Also used by AppUpdateChecker to fetch app_version.json + the APK. -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- In-app APK updater: lets us hand a downloaded update APK to the system
+         package installer. The user still confirms "安裝不明應用程式" per OS policy. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Fallback intent filter visibility for sideload + Play Store policy.
          Even with QUERY_ALL_PACKAGES, declaring <queries> is a defensive fallback. -->
@@ -182,6 +187,18 @@
                 <action android:name="com.anticyscam.app.NOTIFICATION_DISMISSED" />
             </intent-filter>
         </receiver>
+
+        <!-- Exposes the downloaded update APK (cacheDir/update/) to the system
+             package installer as a content:// URI. Paths in @xml/file_paths. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <!-- Device admin scaffold: optional, opt-in only.
              Activation goes through system settings; declared here so it is
