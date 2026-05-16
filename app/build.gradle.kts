@@ -23,6 +23,13 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        ndk {
+            // 16 KB page-size compliance only applies to 64-bit ABIs, and 16 KB
+            // devices are 64-bit only. Drop 32-bit and dead ABIs (mips/armeabi)
+            // bundled by transitive native deps to keep the APK lean.
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
     }
 
     buildTypes {
