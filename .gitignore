@@ -54,6 +54,7 @@ captures/
 .idea/encodings.xml
 .idea/deploymentTargetDropDown.xml
 .idea/deploymentTargetSelector.xml
+.idea/deviceManager.xml
 .idea/kotlinc.xml
 
 # Keystore files
