@@ -1,7 +1,6 @@
 package com.anticyscam.app.ui.warning
 
 import android.app.ActivityManager
-import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -70,22 +69,27 @@ class BlockingWarningActivity : ComponentActivity() {
     }
 
     /**
-     * Show even over the lock screen / dismiss keyguard so the user
-     * cannot escape the warning by locking the phone. API-version-aware
-     * to keep deprecation warnings off the active code path.
+     * Show even over the lock screen so the user cannot escape the warning
+     * by locking the phone — the warning stays visible and interactive on
+     * top of the keyguard.
+     *
+     * We deliberately do NOT call requestDismissKeyguard / FLAG_DISMISS_KEYGUARD:
+     * forcing the fingerprint/PIN prompt the instant the warning appears made
+     * every trigger feel like the device had locked. With showWhenLocked alone
+     * the warning is readable and the confirm button is tappable straight away;
+     * the keyguard prompt is deferred to the return-to-MainActivity step
+     * (MainActivity is not showWhenLocked), which is far less jarring.
+     * API-version-aware to keep deprecation warnings off the active code path.
      */
     private fun applyOverlayWindowFlags() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
-            val km = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
-            km?.requestDismissKeyguard(this, null)
         } else {
             @Suppress("DEPRECATION")
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                    WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
             )
         }
         // Keep this Activity on top of recents / multi-window snap.
