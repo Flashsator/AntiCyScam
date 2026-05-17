@@ -23,6 +23,7 @@ mlkitTextRecognitionChinese = "16.0.1"
 
 voskAndroid = "0.3.75"
 jna = "5.17.0"
+opencc4j = "1.14.0"
 
 junit = "4.13.2"
 junitExt = "1.2.1"
@@ -80,6 +81,9 @@ mlkit-text-recognition-chinese = { group = "com.google.mlkit", name = "text-reco
 # Vosk on-device STT (voice recognition from audio file)
 vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "voskAndroid" }
 jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
+
+# OpenCC4j — Simplified→Traditional conversion (Vosk cn model outputs 簡體)
+opencc4j = { group = "com.github.houbb", name = "opencc4j", version.ref = "opencc4j" }
 
 # Test
 junit = { group = "junit", name = "junit", version.ref = "junit" }

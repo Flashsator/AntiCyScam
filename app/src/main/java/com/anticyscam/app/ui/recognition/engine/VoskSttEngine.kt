@@ -11,7 +11,9 @@ import org.vosk.Recognizer
  * chunks and returns the concatenated transcript.
  *
  * Vosk's Java/JNI binding wants `short[]` chunks; we cap chunk size to keep
- * native calls reasonable.
+ * native calls reasonable. The cn model emits Simplified Chinese, so the
+ * transcript is converted to Traditional via [ChineseScriptConverter] before
+ * being returned.
  */
 object VoskSttEngine {
 
@@ -26,7 +28,11 @@ object VoskSttEngine {
                 var offset = 0
                 while (offset < pcm16kMono.size) {
                     val len = minOf(CHUNK_BYTES, pcm16kMono.size - offset)
-                    val ended = recognizer.acceptWaveForm(pcm16kMono, len)
+                    // Vosk's acceptWaveForm(byte[], int) always reads from index
+                    // 0, so feed it a fresh slice — passing the whole array would
+                    // re-feed the first chunk every iteration.
+                    val chunk = pcm16kMono.copyOfRange(offset, offset + len)
+                    val ended = recognizer.acceptWaveForm(chunk, len)
                     if (ended) {
                         appendPartialResult(transcript, recognizer.result)
                     } else {
@@ -38,7 +44,7 @@ object VoskSttEngine {
             } finally {
                 runCatching { recognizer.close() }
             }
-            transcript.toString().trim()
+            ChineseScriptConverter.toTraditional(transcript.toString().trim())
         }
 
     private fun appendPartialResult(sb: StringBuilder, raw: String) {
