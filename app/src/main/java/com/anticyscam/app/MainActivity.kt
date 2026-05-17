@@ -31,13 +31,15 @@ import javax.inject.Inject
  * Behavior change (測試版彈性限制):
  *   - There is no gate. The user can always enter [MainScreen] and use the
  *     防詐器、詐騙專區、設定 tabs directly.
- *   - 無障礙服務 and 通知 are optional protections enabled from the 設定 tab;
+ *   - 通知、電池白名單 are optional protections enabled from the 設定 tab;
  *     they do not gate anything.
- *   - The "防詐器保護中" foreground notification runs once notification
- *     permission is granted **and** at least one App is bound. We drive the
- *     service start/stop from [ProtectionStateViewModel.shouldRunService].
- *     The service also self-checks on each tick so a stale state still
- *     resolves correctly.
+ *   - The foreground service runs as soon as **at least one App is bound** —
+ *     it is the host of the foreground detector, so it must not depend on the
+ *     optional notification permission. We drive service start/stop from
+ *     [ProtectionStateViewModel.shouldRunService]; the service also
+ *     self-checks on each tick so a stale state still resolves correctly.
+ *     Detection itself additionally needs 使用情況存取權 + 上層顯示, which the
+ *     service evaluates internally.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -72,6 +74,9 @@ class MainActivity : ComponentActivity() {
                     if (shouldRunService) {
                         AntiScamForegroundService.start(applicationContext)
                     } else {
+                        // 未綁定任何 App —— 沒有保護目標。服務自身的
+                        // enforceProtectionState() 也會 stopSelf，此處主動收掉
+                        // 是為了即時反映（避免等到下一個 watchdog tick）。
                         stopService(
                             Intent(applicationContext, AntiScamForegroundService::class.java)
                         )
@@ -103,10 +108,5 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        protectionViewModel.refresh()
     }
 }
