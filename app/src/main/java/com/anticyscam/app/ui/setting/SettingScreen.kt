@@ -1,7 +1,12 @@
 package com.anticyscam.app.ui.setting
 
+import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +49,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -93,6 +99,29 @@ fun SettingScreen() {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    // 通知（Android 13+ 為 runtime 權限）— 用 in-app 系統對話框直接請求，
+    // 不必把使用者丟到系統設定頁。被永久拒絕時系統不再彈窗，退回開啟設定頁。
+    val requestNotificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        viewModel.refreshStatus()
+        if (!granted) {
+            val activity = context as? Activity
+            val canAskAgain = activity != null &&
+                ActivityCompat.shouldShowRequestPermissionRationale(
+                    activity, Manifest.permission.POST_NOTIFICATIONS
+                )
+            if (!canAskAgain) viewModel.openNotificationSettings()
+        }
+    }
+    val openNotification: () -> Unit = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            viewModel.openNotificationSettings()
+        }
+    }
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshStatus()
@@ -128,7 +157,7 @@ fun SettingScreen() {
                     onOpenUsageAccess = viewModel::openUsageAccessSettings,
                     onOpenOverlay = viewModel::requestOverlayPermission,
                     onRequestBattery = viewModel::requestBatteryExemption,
-                    onOpenNotification = viewModel::openNotificationSettings
+                    onOpenNotification = openNotification
                 )
             }
             item {
@@ -178,9 +207,10 @@ fun SettingScreen() {
  * 防詐器保護設定卡。
  *
  * 偵測必需的兩項系統權限：使用情況存取權、上層顯示。再加上兩項選用項目：
- * 「電池白名單」與「通知」。Android 不允許 App 直接代開這些系統權限，因此
- * 「開關」實際是狀態列 +「前往啟用」捷徑，點下後跳系統設定；每項下方附說明
- * 文字解釋用途。
+ * 「電池白名單」與「通知」。使用情況存取權與上層顯示是特殊存取權限，App 無法
+ * 代開，「前往啟用」只能跳系統設定頁；通知（Android 13+ runtime 權限）與電池
+ * 白名單則可在 App 內直接彈系統對話框授權，免進設定頁。每項下方附說明文字解
+ * 釋用途。
  *
  * 卡片邊框：兩項偵測權限都到位時顯示綠色；電池白名單與通知為選用項目，
  * 不影響邊框顏色。

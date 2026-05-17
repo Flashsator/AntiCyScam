@@ -1,14 +1,10 @@
 package com.anticyscam.app
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
@@ -16,7 +12,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.core.content.ContextCompat
 import com.anticyscam.app.data.appupdate.AppUpdateChecker
 import com.anticyscam.app.data.catalog.CatalogUpdateChecker
 import com.anticyscam.app.data.prefs.AntiScamClock
@@ -55,20 +50,13 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var appUpdateChecker: AppUpdateChecker
 
-    private val requestNotificationPermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) {
-        // Either outcome is fine — refresh re-reads the notification state
-        // and re-evaluates whether the foreground notification should run.
-        protectionViewModel.refresh()
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Cold-start tick — feeds the multi-time cooldown gate so simply
         // moving the system clock forward can't free a fresh account.
         clock.incrementOpenCount()
-        maybeRequestPostNotificationsPermission()
+        // 不在啟動時請求通知權限 —— 通知為選用項目，改由「設定」頁的
+        // 「通知（選用）」按鈕在使用者主動點擊時才彈系統對話框。
         catalogUpdateChecker.maybeCheck()
         appUpdateChecker.maybeCheck()
         enableEdgeToEdge()
@@ -120,16 +108,5 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         protectionViewModel.refresh()
-    }
-
-    private fun maybeRequestPostNotificationsPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        val granted = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.POST_NOTIFICATIONS
-        ) == PackageManager.PERMISSION_GRANTED
-        if (!granted) {
-            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
     }
 }
