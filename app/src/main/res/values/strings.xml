@@ -54,7 +54,7 @@
     <string name="gate_status_on">已啟用</string>
     <string name="gate_launch_failed">無法開啟系統設定（%1$s），請手動到 設定 App 內開啟</string>
 
-    <!-- 設定頁：防詐器保護設定（使用情況存取 + 上層顯示 + 選用電池白名單） -->
+    <!-- 設定頁：防詐器保護設定（使用情況存取 + 上層顯示 + 選用電池白名單、通知） -->
     <string name="setting_protection_title">防詐器保護設定</string>
     <string name="setting_feature_usage">使用情況存取權</string>
     <string name="setting_feature_usage_desc">防詐器靠此權限偵測您是否開啟已綁定的 App。需與下方「上層顯示」一起開啟，偵測到風險時才能跳出警告。</string>
@@ -62,6 +62,8 @@
     <string name="setting_feature_overlay_desc">允許防詐器在其他 App 上層顯示畫面。偵測到已綁定的 App 時，靠此權限才能蓋出全螢幕警告；缺少此權限警告將無法顯示。</string>
     <string name="setting_feature_battery">電池白名單（選用）</string>
     <string name="setting_feature_battery_desc">將防詐器加入電池最佳化白名單，避免系統在背景時為了省電而關閉防詐器。建議開啟以確保長時間放著也能持續偵測；不開啟仍可使用，但部分手機在背景閒置較久後可能停止保護。</string>
+    <string name="setting_feature_notification">通知（選用）</string>
+    <string name="setting_feature_notification_desc">開啟後，當您已綁定至少一個 App，防詐器會在通知欄常駐顯示「防詐器保護中」，讓您隨時確認保護運作中；未綁定任何 App 時不會顯示通知。此項為選用 —— 關閉通知不影響偵測與警告，防詐器仍會在背景保護您，只是少了常駐的狀態提示。</string>
 
     <!-- 防詐器主頁權限閘門（「使用情況存取權」+「上層顯示」未開齊則擋整頁） -->
     <string name="main_gate_title">尚未開啟必要權限</string>

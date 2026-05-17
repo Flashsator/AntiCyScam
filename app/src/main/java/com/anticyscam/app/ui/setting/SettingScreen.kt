@@ -124,9 +124,11 @@ fun SettingScreen() {
                     usageStatsGranted = status.usageStatsGranted,
                     overlayGranted = status.overlayPermissionGranted,
                     batteryWhitelisted = status.batteryOptimizationIgnored,
+                    notificationsGranted = status.notificationsEnabled,
                     onOpenUsageAccess = viewModel::openUsageAccessSettings,
                     onOpenOverlay = viewModel::requestOverlayPermission,
-                    onRequestBattery = viewModel::requestBatteryExemption
+                    onRequestBattery = viewModel::requestBatteryExemption,
+                    onOpenNotification = viewModel::openNotificationSettings
                 )
             }
             item {
@@ -175,21 +177,24 @@ fun SettingScreen() {
 /**
  * 防詐器保護設定卡。
  *
- * 偵測必需的兩項系統權限：使用情況存取權、上層顯示。再加上選用的「電池
- * 白名單」。Android 不允許 App 直接代開這些系統權限，因此「開關」實際是
- * 狀態列 +「前往啟用」捷徑，點下後跳系統設定；每項下方附說明文字解釋用途。
+ * 偵測必需的兩項系統權限：使用情況存取權、上層顯示。再加上兩項選用項目：
+ * 「電池白名單」與「通知」。Android 不允許 App 直接代開這些系統權限，因此
+ * 「開關」實際是狀態列 +「前往啟用」捷徑，點下後跳系統設定；每項下方附說明
+ * 文字解釋用途。
  *
- * 卡片邊框：兩項偵測權限都到位時顯示綠色；電池白名單為選用項目，不影響
- * 邊框顏色。
+ * 卡片邊框：兩項偵測權限都到位時顯示綠色；電池白名單與通知為選用項目，
+ * 不影響邊框顏色。
  */
 @Composable
 private fun ProtectionStatusCard(
     usageStatsGranted: Boolean,
     overlayGranted: Boolean,
     batteryWhitelisted: Boolean,
+    notificationsGranted: Boolean,
     onOpenUsageAccess: () -> Unit,
     onOpenOverlay: () -> Unit,
-    onRequestBattery: () -> Unit
+    onRequestBattery: () -> Unit,
+    onOpenNotification: () -> Unit
 ) {
     val detectionReady = usageStatsGranted && overlayGranted
     val borderColor = if (detectionReady) SuccessGreen else AlertYellow
@@ -237,6 +242,12 @@ private fun ProtectionStatusCard(
                 description = stringResource(R.string.setting_feature_battery_desc),
                 enabled = batteryWhitelisted,
                 onOpen = onRequestBattery
+            )
+            ProtectionFeatureBlock(
+                label = stringResource(R.string.setting_feature_notification),
+                description = stringResource(R.string.setting_feature_notification_desc),
+                enabled = notificationsGranted,
+                onOpen = onOpenNotification
             )
         }
     }

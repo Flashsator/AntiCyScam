@@ -184,20 +184,16 @@ class AntiScamForegroundService : Service() {
     }
 
     /**
-     * 守門檢查 — 需求 #3、#4：常駐通知「防詐器保護中」只在「通知權限已授權」
-     * 且「已綁定至少一個 App」時存在。未綁定 App 時顯示通知沒有保護目標，
-     * 因此 stopSelf。裝置管理員／電池白名單為選用的進階保護，不作為服務
+     * 守門檢查 — 需求 #4：服務只在「已綁定至少一個 App」時存活。未綁定 App
+     * 時沒有保護目標，因此 stopSelf，常駐通知「防詐器保護中」一併消失。
+     *
+     * 通知權限為選用：未授權時服務照常運作、照常偵測與跳警告，只是系統不
+     * 顯示常駐通知。裝置管理員／電池白名單同為選用的進階保護，皆不作為服務
      * 存活條件。
      */
     private fun enforceProtectionState(): Boolean {
-        val notifyEnabled = SystemAccessChecker.isNotificationsEnabled(this)
-        val hasBoundApp = boundAppCount > 0
-        if (notifyEnabled && hasBoundApp) return true
-        Log.i(
-            TAG,
-            "Protection notification not warranted (notify=$notifyEnabled, " +
-                "boundApps=$boundAppCount) — stopping service"
-        )
+        if (boundAppCount > 0) return true
+        Log.i(TAG, "No bound app (boundApps=$boundAppCount) — stopping service")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)
         } else {
@@ -215,10 +211,10 @@ class AntiScamForegroundService : Service() {
     }
 
     /**
-     * 此 service 只在「通知權限已授權 + 已綁定 App」時存活（由
-     * [enforceProtectionState] 守門），通知文字一律是「防詐器保護中」。
-     * 電池白名單為選用項目，未加入時不再於通知顯示警告，避免常駐通知一直
-     * 帶警告字樣造成使用者焦慮 —— 入口改放在設定頁的「電池白名單（選用）」。
+     * 此 service 只在「已綁定 App」時存活（由 [enforceProtectionState] 守門），
+     * 通知文字一律是「防詐器保護中」。電池白名單為選用項目，未加入時不再於
+     * 通知顯示警告，避免常駐通知一直帶警告字樣造成使用者焦慮 —— 入口改放在
+     * 設定頁的「電池白名單（選用）」。
      */
     private fun currentStatusText(): String =
         getString(R.string.foreground_service_text)
