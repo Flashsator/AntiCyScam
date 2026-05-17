@@ -147,7 +147,7 @@ domain/
   ├── transfer/       — TransferAccountSettleEngine
   └── recognition/    — ScamDetector、HardRuleEngine、FuzzyMatch、PinyinNormalizer
 di/                   — Hilt modules
-utils/                — AccessibilityChecker、CallRecordingLauncher
+utils/                — SystemAccessChecker、CallRecordingLauncher
 ```
 
 ### 三個關鍵組件

@@ -16,7 +16,7 @@ import com.anticyscam.app.MainActivity
 import com.anticyscam.app.R
 import com.anticyscam.app.data.prefs.AntiScamClock
 import com.anticyscam.app.data.repository.BoundAppRepository
-import com.anticyscam.app.utils.AccessibilityChecker
+import com.anticyscam.app.utils.SystemAccessChecker
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,9 +30,10 @@ import javax.inject.Inject
 
 /**
  * Sticky foreground service that keeps the app process alive on aggressive
- * OEMs (Xiaomi, Oppo, Huawei) so the [AntiScamAccessibilityService] does not
- * get silently killed by background-app reaper. A persistent notification is
- * required by Android — we use it to surface the protection status as well.
+ * OEMs (Xiaomi, Oppo, Huawei) so the [UsageStatsForegroundDetector] foreground
+ * watcher does not get silently killed by the background-app reaper. A
+ * persistent notification is required by Android — we use it to surface the
+ * protection status as well.
  *
  * Lifecycle:
  *  - Started by [MainActivity.onCreate] and by [BootReceiver] after device
@@ -53,8 +54,8 @@ class AntiScamForegroundService : Service() {
     @Volatile private var boundAppCount = 0
     // 通話結束自動偵測 → 掃 OEM 錄音檔 → 通知使用者送進辨識流程
     private val callRecordingDetector by lazy { CallRecordingDetector(this) }
-    // a11y-OFF 後備前景偵測（UsageStats 輪詢）。與無障礙服務互斥，由
-    // [updateDetectionMode] 依無障礙服務開關狀態啟動／停止。
+    // 前景偵測（UsageStats 輪詢）—— 唯一的偵測引擎。由 [updateDetectionMode]
+    // 依「使用情況存取權 + 上層顯示」是否齊備啟動／停止。
     private val usageStatsDetector by lazy {
         UsageStatsForegroundDetector(this, foregroundAppGuard)
     }
@@ -69,8 +70,8 @@ class AntiScamForegroundService : Service() {
         // 綁定數後才決定要不要 stopSelf，避免「冷啟動時 count 仍是 0」的誤判。
         startForegroundCompat()
         callRecordingDetector.start()
-        // 確保前景判決核心的綁定 App 快照被填入 —— a11y 關閉時無障礙服務不會
-        // 呼叫 start()，UsageStats 後備偵測就會拿到空快照。start() 為冪等。
+        // 確保前景判決核心的綁定 App 快照被填入後，UsageStats 偵測才有資料
+        // 可比對。start() 為冪等。
         foregroundAppGuard.start()
         observeBoundAppsAndEnforce()
         // Safety-net settle: BootReceiver also does this, but the service is
@@ -116,19 +117,15 @@ class AntiScamForegroundService : Service() {
     }
 
     /**
-     * 依無障礙服務開關狀態切換前景偵測模式（需求 #2、#5）：
-     *  - a11y 開啟 → [AntiScamAccessibilityService] 以即時事件攔截，UsageStats
-     *    後備偵測必須停掉，否則兩者共用 [ForegroundAppGuard]、會重複跳警告。
-     *  - a11y 關閉 → 沒有即時回呼，啟動 [UsageStatsForegroundDetector] 輪詢，
-     *    但前提是 PACKAGE_USAGE_STATS 與懸浮窗權限都已授權；缺一不可就停掉。
+     * 依特殊權限狀態切換前景偵測。[UsageStatsForegroundDetector] 是唯一的偵測
+     * 引擎，但前提是 PACKAGE_USAGE_STATS 與上層顯示權限都已授權 —— 缺任一項，
+     * 偵測到 App 也無法跳出警告，因此直接停掉。
      * 冪等：detector 的 start／stop 重複呼叫皆為 no-op，可安全於 watchdog 反覆呼叫。
      */
     private fun updateDetectionMode() {
-        val a11yOn = AccessibilityChecker.isOurServiceEnabled(this)
-        val canFallback = !a11yOn &&
-            AccessibilityChecker.hasUsageStatsPermission(this) &&
-            AccessibilityChecker.canDrawOverlays(this)
-        if (canFallback) {
+        val canDetect = SystemAccessChecker.hasUsageStatsPermission(this) &&
+            SystemAccessChecker.canDrawOverlays(this)
+        if (canDetect) {
             usageStatsDetector.start(scope)
         } else {
             usageStatsDetector.stop()
@@ -164,8 +161,9 @@ class AntiScamForegroundService : Service() {
     }
 
     /**
-     * 週期性檢查無障礙服務是否仍存活 + 電池白名單狀態。任一不符就把通知文字
-     * 換成警告版本，給使用者立即可見的回饋。Phase 3 Android 12 可靠性修補。
+     * 週期性重新評估守門狀態與偵測權限。使用者可能在執行期間給／收回
+     * 「使用情況存取權」「上層顯示」，每個 tick 重新評估並切換 UsageStats
+     * 偵測的啟停。Phase 3 Android 12 可靠性修補。
      */
     private fun startWatchdog() {
         if (watchdogJob?.isActive == true) return
@@ -174,8 +172,8 @@ class AntiScamForegroundService : Service() {
                 delay(WATCHDOG_INTERVAL_MS)
                 runCatching {
                     if (!enforceProtectionState()) return@launch
-                    // a11y 服務可能在執行期間被使用者開啟／關閉 —— 每個 tick
-                    // 重新評估，必要時切換 UsageStats 後備偵測的啟停。
+                    // 偵測權限可能在執行期間被使用者開啟／關閉 —— 每個 tick
+                    // 重新評估，必要時切換 UsageStats 偵測的啟停。
                     updateDetectionMode()
                     refreshNotificationFromStatus()
                     // 處理使用者後來給/收回 READ_PHONE_STATE / READ_MEDIA_AUDIO 的情況
@@ -188,11 +186,11 @@ class AntiScamForegroundService : Service() {
     /**
      * 守門檢查 — 需求 #3、#4：常駐通知「防詐器保護中」只在「通知權限已授權」
      * 且「已綁定至少一個 App」時存在。未綁定 App 時顯示通知沒有保護目標，
-     * 因此 stopSelf。無障礙服務／裝置管理員為選用的進階保護，不再作為服務
+     * 因此 stopSelf。裝置管理員／電池白名單為選用的進階保護，不作為服務
      * 存活條件。
      */
     private fun enforceProtectionState(): Boolean {
-        val notifyEnabled = AccessibilityChecker.isNotificationsEnabled(this)
+        val notifyEnabled = SystemAccessChecker.isNotificationsEnabled(this)
         val hasBoundApp = boundAppCount > 0
         if (notifyEnabled && hasBoundApp) return true
         Log.i(
@@ -218,18 +216,12 @@ class AntiScamForegroundService : Service() {
 
     /**
      * 此 service 只在「通知權限已授權 + 已綁定 App」時存活（由
-     * [enforceProtectionState] 守門），正常文字一律是「防詐器保護中」。
-     * 電池白名單未加入時背景可能被系統關閉，因此額外提示；無障礙服務為選用
-     * 進階保護，不在此處作為警告條件。
+     * [enforceProtectionState] 守門），通知文字一律是「防詐器保護中」。
+     * 電池白名單為選用項目，未加入時不再於通知顯示警告，避免常駐通知一直
+     * 帶警告字樣造成使用者焦慮 —— 入口改放在設定頁的「電池白名單（選用）」。
      */
-    private fun currentStatusText(): String {
-        val batteryOk = AccessibilityChecker.isBatteryOptimizationIgnored(this)
-        return if (batteryOk) {
-            getString(R.string.foreground_service_text)
-        } else {
-            "⚠ 未加電池白名單 — 背景時可能被系統關閉"
-        }
-    }
+    private fun currentStatusText(): String =
+        getString(R.string.foreground_service_text)
 
     private fun buildNotification(text: String): Notification {
         val pendingIntent = PendingIntent.getActivity(

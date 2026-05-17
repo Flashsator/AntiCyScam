@@ -58,7 +58,7 @@ class ForegroundAppGuard @Inject constructor(
      * to AllowAuthorized without consuming another grant, so mid-session
      * window churn cannot re-trigger the warning. True transient system
      * overlays (SystemUI, etc.) never reach [evaluate]: they are filtered
-     * by IGNORED_PACKAGES in AntiScamAccessibilityService.
+     * out by [UsageStatsForegroundDetector] before evaluation.
      */
     @Volatile
     private var authorizedSessionPackage: String? = null
@@ -67,10 +67,10 @@ class ForegroundAppGuard @Inject constructor(
     private var started = false
 
     /**
-     * Idempotent. Both [AntiScamAccessibilityService] (a11y-ON path) and
-     * [AntiScamForegroundService]'s [UsageStatsForegroundDetector] (a11y-OFF
-     * path) call this; whichever runs first populates the snapshot, the
-     * second call is a no-op so the repository flow is collected only once.
+     * Idempotent. Called by [AntiScamForegroundService] (directly and via its
+     * [UsageStatsForegroundDetector]); whichever call runs first populates the
+     * snapshot, later calls are no-ops so the repository flow is collected only
+     * once.
      */
     @Synchronized
     fun start() {

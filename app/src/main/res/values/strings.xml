@@ -42,10 +42,6 @@
     <string name="warning_confirm">我知道了</string>
     <string name="warning_blocked_label_format">被攔截：%1$s</string>
 
-    <!-- Accessibility service (Phase 7) -->
-    <string name="accessibility_service_label">防詐器保護服務</string>
-    <string name="accessibility_service_description">當您嘗試打開已綁定的 App（例如網銀）卻不是從防詐器進入時，防詐器會跳出警告並把您帶回防詐器確認。此服務不會收集您的任何個人資料。</string>
-
     <!-- Foreground service + Device Admin (PRD §8) -->
     <string name="foreground_service_title">防詐器保護中</string>
     <string name="foreground_service_text">背景監測中，正在守護您的轉帳安全</string>
@@ -54,24 +50,22 @@
     <string name="device_admin_disable_warning">關閉裝置管理員將解除防詐器的防誤刪保護。建議保持開啟以確保功能完整。</string>
 
     <!-- Shared protection-feature strings (used by 設定 toggles) -->
-    <string name="gate_item_a11y">無障礙服務</string>
-    <string name="gate_item_a11y_desc">攔截綁定 App 的直接開啟並提醒</string>
     <string name="gate_action_enable">前往啟用</string>
     <string name="gate_status_on">已啟用</string>
-    <string name="gate_accessibility_open_hint">若沒看到「防詐器」開關，請在清單中向下捲動找「防詐器保護服務」</string>
     <string name="gate_launch_failed">無法開啟系統設定（%1$s），請手動到 設定 App 內開啟</string>
 
-    <!-- 設定頁：防詐器保護開關（無障礙服務 + 使用情況存取 + 上層顯示） -->
+    <!-- 設定頁：防詐器保護設定（使用情況存取 + 上層顯示 + 選用電池白名單） -->
     <string name="setting_protection_title">防詐器保護設定</string>
-    <string name="setting_feature_a11y_desc">⚠️ 開啟後，只要偵測到您未從防詐器進入已綁定的 App，就會持續跳出全螢幕警告把您擋回防詐器，直到您改從防詐器進入為止。這是最強的保護模式，但也代表您無法略過警告強行進入 App。請確認您了解此行為後再開啟。未開啟時，防詐器改用下方「使用情況存取權」與「上層顯示」兩項權限進行後備偵測。</string>
     <string name="setting_feature_usage">使用情況存取權</string>
-    <string name="setting_feature_usage_desc">未開啟無障礙服務時，防詐器改以此權限偵測您是否開啟已綁定的 App。此為後備偵測，需與下方「上層顯示」一起開啟才能跳出警告。</string>
+    <string name="setting_feature_usage_desc">防詐器靠此權限偵測您是否開啟已綁定的 App。需與下方「上層顯示」一起開啟，偵測到風險時才能跳出警告。</string>
     <string name="setting_feature_overlay">上層顯示</string>
-    <string name="setting_feature_overlay_desc">允許防詐器在其他 App 上層顯示畫面。後備偵測模式下，偵測到已綁定的 App 時，靠此權限才能蓋出全螢幕警告；缺少此權限警告將無法顯示。</string>
+    <string name="setting_feature_overlay_desc">允許防詐器在其他 App 上層顯示畫面。偵測到已綁定的 App 時，靠此權限才能蓋出全螢幕警告；缺少此權限警告將無法顯示。</string>
+    <string name="setting_feature_battery">電池白名單（選用）</string>
+    <string name="setting_feature_battery_desc">將防詐器加入電池最佳化白名單，避免系統在背景時為了省電而關閉防詐器。建議開啟以確保長時間放著也能持續偵測；不開啟仍可使用，但部分手機在背景閒置較久後可能停止保護。</string>
 
     <!-- 防詐器主頁權限閘門（「使用情況存取權」+「上層顯示」未開齊則擋整頁） -->
     <string name="main_gate_title">尚未開啟必要權限</string>
-    <string name="main_gate_body">防詐器主功能需要下列兩項權限才能運作。未開啟「無障礙服務」時，防詐器靠這兩項做後備偵測；缺任一項，偵測到 App 也無法跳出警告。請全部開啟後再使用。</string>
+    <string name="main_gate_body">防詐器主功能需要下列兩項權限才能運作。防詐器靠這兩項偵測您是否開啟已綁定的 App；缺任一項，偵測到 App 也無法跳出警告。請全部開啟後再使用。</string>
     <string name="main_gate_usage_desc">用來偵測您是否開啟已綁定的 App。缺少此權限，防詐器無法得知您切換到哪個 App。</string>
     <string name="main_gate_overlay_desc">用來在 App 上層蓋出全螢幕警告。缺少此權限，即使偵測到風險也無法顯示警告。</string>
 

@@ -1,6 +1,5 @@
 package com.anticyscam.app.utils
 
-import android.accessibilityservice.AccessibilityServiceInfo
 import android.annotation.SuppressLint
 import android.app.AppOpsManager
 import android.app.admin.DevicePolicyManager
@@ -11,123 +10,25 @@ import android.net.Uri
 import android.os.PowerManager
 import android.os.Process
 import android.provider.Settings
-import android.text.TextUtils
 import android.util.Log
-import android.view.accessibility.AccessibilityManager
 import androidx.core.app.NotificationManagerCompat
 import com.anticyscam.app.R
-import com.anticyscam.app.service.AntiScamAccessibilityService
 import com.anticyscam.app.service.AntiScamDeviceAdminReceiver
 
 /**
- * Inspects system settings to determine whether [AntiScamAccessibilityService]
- * is currently enabled. This is the single source of truth used by the
- * accessibility gate.
+ * Inspects system settings to determine the state of the special permissions
+ * the app depends on: battery-optimization whitelist, overlay (上層顯示),
+ * usage-access (PACKAGE_USAGE_STATS), device admin, and notifications.
  *
- * Why not use [android.view.accessibility.AccessibilityManager.isEnabled]?
- *   That returns true if ANY accessibility service is enabled — not
- *   specifically ours. We need the per-service answer, so we parse the
- *   Settings.Secure value directly.
+ * None of these can be granted at runtime — they live behind dedicated system
+ * settings pages — so this object both *reads* their state and produces the
+ * [Intent]s that route the user to the right page to flip them on.
  */
-object AccessibilityChecker {
+object SystemAccessChecker {
 
     /**
-     * 偵測無障礙服務是否啟用。原本只看 `Settings.Secure.ACCESSIBILITY_ENABLED`
-     * + `ENABLED_ACCESSIBILITY_SERVICES` flat ID 嚴格比對，在 Android 12 部分
-     * OEM ROM 上會出現「使用者已啟用、master switch 卻沒更新」的 race，造成
-     * App 永遠顯示未啟用。改成下列三層偵測順序：
-     *
-     *   1. [AccessibilityManager.getEnabledAccessibilityServiceList] —
-     *      官方 API，回傳目前真正啟用中的服務清單；只要其中有我們的 component
-     *      就回 true。這是最可靠的來源。
-     *   2. Settings.Secure 解析，但放寬：接受 long form（flat）與 short form
-     *      （flatShort），且不再強制要求 master switch=1。實際上 Android 12
-     *      在使用者「開啟第一個 a11y service」時 master switch 的寫入是非
-     *      synchronous，App 可能在中間 tick 看到不一致狀態。
-     *   3. 都判定 false → 真的沒啟用。
-     */
-    fun isOurServiceEnabled(context: Context): Boolean {
-        val expectedComponent = ComponentName(context, AntiScamAccessibilityService::class.java)
-        val expectedFlat = expectedComponent.flattenToString()
-        val expectedShort = expectedComponent.flattenToShortString()
-        val expectedPkg = context.packageName
-        val expectedClass = AntiScamAccessibilityService::class.java.name
-
-        val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
-        if (am != null) {
-            val enabled = runCatching {
-                am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
-            }.getOrNull().orEmpty()
-            for (info in enabled) {
-                val id = info.id
-                if (id != null && (
-                        id.equals(expectedFlat, ignoreCase = true) ||
-                            id.equals(expectedShort, ignoreCase = true)
-                        )
-                ) return true
-                val sInfo = info.resolveInfo?.serviceInfo ?: continue
-                if (sInfo.packageName == expectedPkg && sInfo.name == expectedClass) return true
-            }
-        }
-
-        val raw = Settings.Secure.getString(
-            context.contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        ).orEmpty()
-        if (raw.isEmpty()) return false
-        val splitter = TextUtils.SimpleStringSplitter(SERVICE_DELIMITER)
-        splitter.setString(raw)
-        for (entry in splitter) {
-            if (entry.equals(expectedFlat, ignoreCase = true) ||
-                entry.equals(expectedShort, ignoreCase = true)
-            ) return true
-        }
-        return false
-    }
-
-    /**
-     * 啟動「無障礙服務設定頁」，盡量直接跳到本 App 的開關位置。
-     *
-     * 為什麼不再用 `resolveActivity` 預判？
-     *   實測在 Android 12 部分 OEM ROM 上，`ACCESSIBILITY_DETAILS_SETTINGS` 的
-     *   `resolveActivity` 會回非 null，但實際 startActivity 卻拋 Security/
-     *   ActivityNotFoundException — 預判結果與實際路由不一致。改成「直接 try、
-     *   失敗才走下一個」最可靠。
-     *
-     * Fallback 順序（每一個都包 try-catch，失敗就試下一個）：
-     *   1. `ACCESSIBILITY_DETAILS_SETTINGS` + EXTRA_COMPONENT_NAME（AOSP API 26+，
-     *      直接打開指定 service 的詳細頁）
-     *   2. `Settings.ACTION_ACCESSIBILITY_SETTINGS`（純 action，不帶 fragment_args；
-     *      Android 12+ Settings 對 `:settings:show_fragment_args` 做了 sanitization，
-     *      帶上反而會被擋）
-     *   3. `Settings.ACTION_SETTINGS`（保底，系統一定有）
-     */
-    fun launchA11ySettings(context: Context): LaunchResult {
-        val componentStr = ComponentName(
-            context,
-            AntiScamAccessibilityService::class.java
-        ).flattenToString()
-
-        val candidates = listOf(
-            Intent(ACTION_ACCESSIBILITY_DETAILS_SETTINGS).apply {
-                putExtra(Intent.EXTRA_COMPONENT_NAME, componentStr)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            },
-            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            },
-            Intent(Settings.ACTION_SETTINGS).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        )
-        // 第 0 個成功才算「直接到 service 詳情頁」；其他都需要使用者手動點到 App。
-        return tryLaunchChain(context, candidates, directIndices = setOf(0))
-    }
-
-    /**
-     * 是否已加入電池白名單。Android 12+ doze 模式在背景時會更激進，
-     * 對 AccessibilityService 影響顯著；未加白名單常見症狀是「綁定 App 直開
-     * 卻沒跳警告」。
+     * 是否已加入電池白名單。Android 12+ doze 模式在背景時會更激進，未加白名單
+     * 常見症狀是前景服務在背景被系統關閉。屬選用的進階保護項目。
      */
     fun isBatteryOptimizationIgnored(context: Context): Boolean {
         val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
@@ -148,9 +49,8 @@ object AccessibilityChecker {
         }
 
     /**
-     * 是否已授予 SYSTEM_ALERT_WINDOW（畫面上方覆蓋）。Phase H 之後，攔截警告
-     * 改用 TYPE_ACCESSIBILITY_OVERLAY 直接由 AccessibilityService 繪製，本身
-     * 不需要 SYSTEM_ALERT_WINDOW；保留此檢查作為未來 fallback／diagnostic 用途。
+     * 是否已授予 SYSTEM_ALERT_WINDOW（上層顯示）。前景偵測偵測到未授權開啟
+     * 已綁定 App 時，靠此權限才能蓋出全螢幕警告。
      */
     fun canDrawOverlays(context: Context): Boolean = Settings.canDrawOverlays(context)
 
@@ -161,9 +61,9 @@ object AccessibilityChecker {
         }
 
     /**
-     * 是否已授予 PACKAGE_USAGE_STATS（使用情況存取）特殊權限。需求 #2 的
-     * a11y-OFF 後備偵測 [UsageStatsForegroundDetector] 靠 `UsageStatsManager`
-     * 輪詢前景 App，沒有此權限 `queryEvents` 一律回空。
+     * 是否已授予 PACKAGE_USAGE_STATS（使用情況存取）特殊權限。前景偵測
+     * [com.anticyscam.app.service.UsageStatsForegroundDetector] 靠
+     * `UsageStatsManager` 輪詢前景 App，沒有此權限 `queryEvents` 一律回空。
      *
      * 此權限無法用 runtime request 取得，只能由使用者在「使用情況存取權」
      * 設定頁手動開啟，因此用 [AppOpsManager] 查授權狀態 —— 一般 permission
@@ -290,12 +190,7 @@ object AccessibilityChecker {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
-    private const val TAG = "AccessibilityChecker"
-    private const val SERVICE_DELIMITER = ':'
-
-    // API 26 起加入，但常數一直到 SDK 31 才公開；用字串避免編譯期版本依賴。
-    private const val ACTION_ACCESSIBILITY_DETAILS_SETTINGS =
-        "android.settings.ACCESSIBILITY_DETAILS_SETTINGS"
+    private const val TAG = "SystemAccessChecker"
 
     // 隱藏 action — AOSP/OEM 支援度不一，作為主要入口比 ADD_DEVICE_ADMIN 穩定。
     private const val ACTION_DEVICE_ADMIN_SETTINGS =
@@ -306,9 +201,8 @@ object AccessibilityChecker {
  * `startActivity` 鏈式嘗試的結果。
  *
  *   - [launched]：是否任一個 candidate 成功啟動（沒拋 exception）
- *   - [isDirect]：成功的 candidate 是否能直接帶到目標位置（例如 a11y 服務的
- *     詳情頁）。false 表示落到清單頁或主設定頁，UI 端應 toast 提示使用者
- *     手動找到「防詐器」並開啟。
+ *   - [isDirect]：成功的 candidate 是否能直接帶到目標位置。false 表示落到
+ *     清單頁或主設定頁，UI 端應 toast 提示使用者手動找到「防詐器」並開啟。
  *   - [attemptIndex]：成功的 candidate 在原本鏈中的索引；全失敗時為 -1
  *   - [error]：全失敗時的最後一個例外（用於 debug toast）
  */

@@ -4,7 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.anticyscam.app.data.repository.BoundAppRepository
-import com.anticyscam.app.utils.AccessibilityChecker
+import com.anticyscam.app.utils.SystemAccessChecker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,7 +30,7 @@ class ProtectionStateViewModel @Inject constructor(
 ) : AndroidViewModel(application) {
 
     private val notificationsEnabled = MutableStateFlow(
-        AccessibilityChecker.isNotificationsEnabled(application)
+        SystemAccessChecker.isNotificationsEnabled(application)
     )
 
     /** True when the foreground service + its persistent notification should run. */
@@ -47,6 +47,6 @@ class ProtectionStateViewModel @Inject constructor(
 
     fun refresh() {
         notificationsEnabled.value =
-            AccessibilityChecker.isNotificationsEnabled(getApplication())
+            SystemAccessChecker.isNotificationsEnabled(getApplication())
     }
 }

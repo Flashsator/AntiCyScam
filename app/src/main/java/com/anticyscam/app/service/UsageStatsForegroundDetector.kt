@@ -22,16 +22,15 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * a11y-OFF 後備前景偵測（需求 #2 的折衷方案 —— 使用者選 Q1 = UsageStats）。
+ * 前景偵測 —— 防詐器唯一的前景 App 監測引擎。
  *
- * 無障礙服務未啟用時，Android 沒有任何「即時」回呼能得知別的 App 被帶到
- * 前景；唯一的替代是 [UsageStatsManager]（需 PACKAGE_USAGE_STATS 特殊權限）。
- * 本類別以約 1 秒輪詢最近的前景事件，命中已綁定 App 時用
- * `TYPE_APPLICATION_OVERLAY`（需 SYSTEM_ALERT_WINDOW）蓋上同一張全螢幕警告。
+ * Android 沒有提供一般 App「即時」回呼能得知別的 App 被帶到前景；唯一的
+ * 途徑是 [UsageStatsManager]（需 PACKAGE_USAGE_STATS 特殊權限）。本類別以約
+ * 1 秒輪詢最近的前景事件，命中已綁定 App 時用 `TYPE_APPLICATION_OVERLAY`
+ * （需 SYSTEM_ALERT_WINDOW）蓋上全螢幕警告。
  *
- * 與 [AntiScamAccessibilityService] **互斥**：僅在 a11y 關閉時由
- * [AntiScamForegroundService] 啟動 —— 兩者共用 [ForegroundAppGuard]，同時跑
- * 會重複跳警告。輪詢有 ~1s 延遲，比 a11y 事件略慢。
+ * 由 [AntiScamForegroundService] 在「使用情況存取權 + 上層顯示」都授權時
+ * 啟動。輪詢有 ~1s 延遲，可能漏掉極快速的前後切換。
  */
 class UsageStatsForegroundDetector(
     private val context: Context,

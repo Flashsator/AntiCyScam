@@ -77,7 +77,7 @@ private val ButtonShape = RoundedCornerShape(8.dp)
  * 設定頁 — 顯示防詐器目前狀態與資料管理。
  *
  * 區塊：
- *  1. 無障礙服務狀態（onResume 重新檢查；未啟用時提供前往系統設定的按鈕）
+ *  1. 防詐器保護設定（偵測權限 + 選用的電池白名單；onResume 重新檢查）
  *  2. 統計：已綁定 App 數 / 已建立轉帳帳號數
  *  3. 165 反詐騙專線（撥號 Intent）
  *  4. 關於：版本資訊
@@ -95,7 +95,7 @@ fun SettingScreen() {
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshAccessibilityStatus()
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshStatus()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -121,12 +121,12 @@ fun SettingScreen() {
             }
             item {
                 ProtectionStatusCard(
-                    a11yEnabled = status.accessibilityEnabled,
                     usageStatsGranted = status.usageStatsGranted,
                     overlayGranted = status.overlayPermissionGranted,
-                    onOpenA11y = viewModel::openAccessibilitySettings,
+                    batteryWhitelisted = status.batteryOptimizationIgnored,
                     onOpenUsageAccess = viewModel::openUsageAccessSettings,
-                    onOpenOverlay = viewModel::requestOverlayPermission
+                    onOpenOverlay = viewModel::requestOverlayPermission,
+                    onRequestBattery = viewModel::requestBatteryExemption
                 )
             }
             item {
@@ -173,26 +173,26 @@ fun SettingScreen() {
 }
 
 /**
- * 防詐器保護設定卡（需求 #3）。
+ * 防詐器保護設定卡。
  *
- * 三項系統權限：無障礙服務、使用情況存取權、上層顯示。Android 不允許 App
- * 直接代開這些系統權限，因此「開關」實際是狀態列 +「前往啟用」捷徑，點下後
- * 跳系統設定。每項下方附說明文字解釋開啟後的效果。
+ * 偵測必需的兩項系統權限：使用情況存取權、上層顯示。再加上選用的「電池
+ * 白名單」。Android 不允許 App 直接代開這些系統權限，因此「開關」實際是
+ * 狀態列 +「前往啟用」捷徑，點下後跳系統設定；每項下方附說明文字解釋用途。
  *
- * 無障礙服務為最強模式；未開啟時改由「使用情況存取權 + 上層顯示」兩項一起
- * 構成後備偵測（[com.anticyscam.app.service.UsageStatsForegroundDetector]），
- * 因此三項一律顯示，方便使用者預先授權後備路徑。
+ * 卡片邊框：兩項偵測權限都到位時顯示綠色；電池白名單為選用項目，不影響
+ * 邊框顏色。
  */
 @Composable
 private fun ProtectionStatusCard(
-    a11yEnabled: Boolean,
     usageStatsGranted: Boolean,
     overlayGranted: Boolean,
-    onOpenA11y: () -> Unit,
+    batteryWhitelisted: Boolean,
     onOpenUsageAccess: () -> Unit,
-    onOpenOverlay: () -> Unit
+    onOpenOverlay: () -> Unit,
+    onRequestBattery: () -> Unit
 ) {
-    val borderColor = if (a11yEnabled) SuccessGreen else AlertYellow
+    val detectionReady = usageStatsGranted && overlayGranted
+    val borderColor = if (detectionReady) SuccessGreen else AlertYellow
     val border = remember(borderColor) { BorderStroke(1.dp, borderColor) }
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -210,7 +210,7 @@ private fun ProtectionStatusCard(
             ) {
                 Icon(
                     imageVector =
-                        if (a11yEnabled) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                        if (detectionReady) Icons.Filled.CheckCircle else Icons.Filled.Warning,
                     contentDescription = null,
                     tint = borderColor
                 )
@@ -220,13 +220,6 @@ private fun ProtectionStatusCard(
                     style = MaterialTheme.typography.titleMedium
                 )
             }
-            ProtectionFeatureBlock(
-                label = stringResource(R.string.gate_item_a11y),
-                description = stringResource(R.string.setting_feature_a11y_desc),
-                enabled = a11yEnabled,
-                onOpen = onOpenA11y,
-                isWarning = true
-            )
             ProtectionFeatureBlock(
                 label = stringResource(R.string.setting_feature_usage),
                 description = stringResource(R.string.setting_feature_usage_desc),
@@ -238,6 +231,12 @@ private fun ProtectionStatusCard(
                 description = stringResource(R.string.setting_feature_overlay_desc),
                 enabled = overlayGranted,
                 onOpen = onOpenOverlay
+            )
+            ProtectionFeatureBlock(
+                label = stringResource(R.string.setting_feature_battery),
+                description = stringResource(R.string.setting_feature_battery_desc),
+                enabled = batteryWhitelisted,
+                onOpen = onRequestBattery
             )
         }
     }

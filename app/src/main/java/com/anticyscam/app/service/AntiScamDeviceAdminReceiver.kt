@@ -11,7 +11,7 @@ import com.anticyscam.app.R
  *
  * 需求 #3：開啟「裝置管理員」是進入防詐器主功能的三項條件之一。Receiver 本身
  * 不主動觸發任何政策動作 — 啟用態僅用於把「使用者可一鍵移除 App」的風險墊高，
- * 並讓 [com.anticyscam.app.utils.AccessibilityChecker.isDeviceAdminActive]
+ * 並讓 [com.anticyscam.app.utils.SystemAccessChecker.isDeviceAdminActive]
  * 取得正確的狀態。
  *
  * [onDisableRequested] 在使用者於系統設定按下「停用裝置管理員」時觸發；回傳的

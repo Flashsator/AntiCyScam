@@ -10,7 +10,7 @@ import com.anticyscam.app.data.repository.ScamInfoRepository
 import com.anticyscam.app.data.repository.TransferAccountRepository
 import com.anticyscam.app.service.ForegroundAppGuard
 import com.anticyscam.app.ui.warning.BlockingWarningActivity
-import com.anticyscam.app.utils.AccessibilityChecker
+import com.anticyscam.app.utils.SystemAccessChecker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,12 +26,11 @@ import javax.inject.Inject
 /**
  * Settings screen state + actions.
  *
- * Two state surfaces:
- *  - [status] is a derived StateFlow combining bound-app count, transfer-account
- *    count, and the live accessibility-service status. The a11y status is
- *    refreshed via [refreshAccessibilityStatus] because there is no Android
- *    callback for "user toggled our service in system settings" — we re-read
- *    on resume.
+ * [status] is a derived StateFlow combining bound-app / transfer-account counts
+ * with the live special-permission states (battery whitelist, overlay,
+ * usage-access, device admin, notifications). None of those permissions emit
+ * a system callback when the user toggles them in system settings, so
+ * [refreshStatus] re-reads them on resume.
  */
 @HiltViewModel
 class SettingViewModel @Inject constructor(
@@ -43,28 +42,24 @@ class SettingViewModel @Inject constructor(
     private val catalogUpdateChecker: CatalogUpdateChecker
 ) : ViewModel() {
 
-    private val accessibilityEnabled = MutableStateFlow(
-        AccessibilityChecker.isOurServiceEnabled(appContext)
-    )
-
     private val batteryIgnored = MutableStateFlow(
-        AccessibilityChecker.isBatteryOptimizationIgnored(appContext)
+        SystemAccessChecker.isBatteryOptimizationIgnored(appContext)
     )
 
     private val overlayGranted = MutableStateFlow(
-        AccessibilityChecker.canDrawOverlays(appContext)
+        SystemAccessChecker.canDrawOverlays(appContext)
     )
 
     private val deviceAdminActive = MutableStateFlow(
-        AccessibilityChecker.isDeviceAdminActive(appContext)
+        SystemAccessChecker.isDeviceAdminActive(appContext)
     )
 
     private val notificationsEnabled = MutableStateFlow(
-        AccessibilityChecker.isNotificationsEnabled(appContext)
+        SystemAccessChecker.isNotificationsEnabled(appContext)
     )
 
     private val usageStatsGranted = MutableStateFlow(
-        AccessibilityChecker.hasUsageStatsPermission(appContext)
+        SystemAccessChecker.hasUsageStatsPermission(appContext)
     )
 
     val status: StateFlow<SettingStatus> = combine(
@@ -72,7 +67,6 @@ class SettingViewModel @Inject constructor(
         transferAccountRepository.observeAccounts().map { list ->
             list.count { !it.isDefault }
         },
-        accessibilityEnabled,
         batteryIgnored,
         overlayGranted,
         deviceAdminActive,
@@ -81,14 +75,13 @@ class SettingViewModel @Inject constructor(
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         SettingStatus(
-            accessibilityEnabled = values[2] as Boolean,
             boundAppCount = values[0] as Int,
             transferAccountCount = values[1] as Int,
-            batteryOptimizationIgnored = values[3] as Boolean,
-            overlayPermissionGranted = values[4] as Boolean,
-            deviceAdminActive = values[5] as Boolean,
-            notificationsEnabled = values[6] as Boolean,
-            usageStatsGranted = values[7] as Boolean
+            batteryOptimizationIgnored = values[2] as Boolean,
+            overlayPermissionGranted = values[3] as Boolean,
+            deviceAdminActive = values[4] as Boolean,
+            notificationsEnabled = values[5] as Boolean,
+            usageStatsGranted = values[6] as Boolean
         )
     }.stateIn(
         scope = viewModelScope,
@@ -121,34 +114,30 @@ class SettingViewModel @Inject constructor(
         }
     }
 
-    fun refreshAccessibilityStatus() {
-        accessibilityEnabled.value = AccessibilityChecker.isOurServiceEnabled(appContext)
-        batteryIgnored.value = AccessibilityChecker.isBatteryOptimizationIgnored(appContext)
-        overlayGranted.value = AccessibilityChecker.canDrawOverlays(appContext)
-        deviceAdminActive.value = AccessibilityChecker.isDeviceAdminActive(appContext)
-        notificationsEnabled.value = AccessibilityChecker.isNotificationsEnabled(appContext)
-        usageStatsGranted.value = AccessibilityChecker.hasUsageStatsPermission(appContext)
+    /** Re-read every special-permission state; call from the screen's onResume. */
+    fun refreshStatus() {
+        batteryIgnored.value = SystemAccessChecker.isBatteryOptimizationIgnored(appContext)
+        overlayGranted.value = SystemAccessChecker.canDrawOverlays(appContext)
+        deviceAdminActive.value = SystemAccessChecker.isDeviceAdminActive(appContext)
+        notificationsEnabled.value = SystemAccessChecker.isNotificationsEnabled(appContext)
+        usageStatsGranted.value = SystemAccessChecker.hasUsageStatsPermission(appContext)
     }
 
     fun openDeviceAdminSettings() {
-        AccessibilityChecker.launchDeviceAdminEnable(appContext)
+        SystemAccessChecker.launchDeviceAdminEnable(appContext)
     }
 
     fun openNotificationSettings() {
-        val intent = AccessibilityChecker.openAppNotificationSettingsIntent(appContext)
+        val intent = SystemAccessChecker.openAppNotificationSettingsIntent(appContext)
         runCatching { appContext.startActivity(intent) }
     }
 
-    fun openAccessibilitySettings() {
-        AccessibilityChecker.launchA11ySettings(appContext)
-    }
-
     /**
-     * 開啟「使用情況存取權」設定頁。a11y 未開啟時，[UsageStatsForegroundDetector]
-     * 後備偵測需要此特殊權限才能輪詢前景 App。
+     * 開啟「使用情況存取權」設定頁。[UsageStatsForegroundDetector] 前景偵測
+     * 需要此特殊權限才能輪詢前景 App。
      */
     fun openUsageAccessSettings() {
-        val intent = AccessibilityChecker.openUsageAccessSettingsIntent(appContext.packageName)
+        val intent = SystemAccessChecker.openUsageAccessSettingsIntent(appContext.packageName)
         runCatching { appContext.startActivity(intent) }
     }
 
@@ -168,14 +157,14 @@ class SettingViewModel @Inject constructor(
     }
 
     fun requestBatteryExemption() {
-        val intent = AccessibilityChecker.requestBatteryOptimizationExemptionIntent(
+        val intent = SystemAccessChecker.requestBatteryOptimizationExemptionIntent(
             appContext.packageName
         )
         runCatching { appContext.startActivity(intent) }
     }
 
     fun requestOverlayPermission() {
-        val intent = AccessibilityChecker.openOverlayPermissionIntent(appContext.packageName)
+        val intent = SystemAccessChecker.openOverlayPermissionIntent(appContext.packageName)
         runCatching { appContext.startActivity(intent) }
     }
 
@@ -189,7 +178,6 @@ class SettingViewModel @Inject constructor(
     }
 
     data class SettingStatus(
-        val accessibilityEnabled: Boolean = false,
         val boundAppCount: Int = 0,
         val transferAccountCount: Int = 0,
         val batteryOptimizationIgnored: Boolean = false,

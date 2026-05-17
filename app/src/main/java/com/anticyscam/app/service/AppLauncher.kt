@@ -8,13 +8,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Launches a bound app **with authorization** so the
- * [AntiScamAccessibilityService] does NOT trigger the blocking warning.
+ * Launches a bound app **with authorization** so [UsageStatsForegroundDetector]
+ * does NOT trigger the blocking warning.
  *
- * Order matters: authorize THEN start the activity. The kernel may
- * deliver the resulting WINDOW_STATE_CHANGED event before the launching
- * activity's `startActivity` returns, so the grant must already be in
- * place when the AccessibilityService consults the tracker.
+ * Order matters: authorize THEN start the activity. The foreground poll may
+ * observe the bound app surfacing before the launching activity's
+ * `startActivity` returns, so the grant must already be in place when the
+ * detector consults the tracker.
  */
 @Singleton
 class AppLauncher @Inject constructor(

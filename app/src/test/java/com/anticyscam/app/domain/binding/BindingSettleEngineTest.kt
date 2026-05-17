@@ -348,9 +348,8 @@ class BindingSettleEngineTest {
 
     @Test
     fun `constants match product spec`() {
-        // TEMP TEST VALUES — revert to 24h / 48h alongside BindingSettleEngine.
-        assertEquals(2L * 60L * 1000L, BindingSettleEngine.MATURATION_MS)
-        assertEquals(3L * 60L * 1000L, BindingSettleEngine.UNBIND_COOLDOWN_MS)
+        assertEquals(24L * 60L * 60L * 1000L, BindingSettleEngine.MATURATION_MS)
+        assertEquals(48L * 60L * 60L * 1000L, BindingSettleEngine.UNBIND_COOLDOWN_MS)
         assertEquals(24L * 60L * 60L * 1000L, BindingSettleEngine.MAX_BOOT_WALL_DELTA_MS)
     }
 }

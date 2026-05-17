@@ -2,7 +2,7 @@ package com.anticyscam.app.ui.mainfunction
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
-import com.anticyscam.app.utils.AccessibilityChecker
+import com.anticyscam.app.utils.SystemAccessChecker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,8 +45,8 @@ class MainGateViewModel @Inject constructor(
     private fun readState(): GateState {
         val ctx = getApplication<Application>()
         return GateState(
-            usageStatsGranted = AccessibilityChecker.hasUsageStatsPermission(ctx),
-            overlayGranted = AccessibilityChecker.canDrawOverlays(ctx)
+            usageStatsGranted = SystemAccessChecker.hasUsageStatsPermission(ctx),
+            overlayGranted = SystemAccessChecker.canDrawOverlays(ctx)
         )
     }
 
@@ -54,7 +54,7 @@ class MainGateViewModel @Inject constructor(
         val ctx = getApplication<Application>()
         runCatching {
             ctx.startActivity(
-                AccessibilityChecker.openUsageAccessSettingsIntent(ctx.packageName)
+                SystemAccessChecker.openUsageAccessSettingsIntent(ctx.packageName)
             )
         }
     }
@@ -63,7 +63,7 @@ class MainGateViewModel @Inject constructor(
         val ctx = getApplication<Application>()
         runCatching {
             ctx.startActivity(
-                AccessibilityChecker.openOverlayPermissionIntent(ctx.packageName)
+                SystemAccessChecker.openOverlayPermissionIntent(ctx.packageName)
             )
         }
     }
