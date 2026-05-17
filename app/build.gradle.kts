@@ -24,25 +24,35 @@ android {
             useSupportLibrary = true
         }
 
-        ndk {
-            // 16 KB page-size compliance only applies to 64-bit ABIs, and 16 KB
-            // devices are 64-bit only. Drop 32-bit and dead ABIs (mips/armeabi)
-            // bundled by transitive native deps to keep the APK lean.
-            abiFilters += listOf("arm64-v8a", "x86_64")
-        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Local-verification signing only: lets `assembleRelease` produce
+            // an installable APK so R8 output can be tested on a real device.
+            // Replace with a dedicated upload keystore before any real
+            // distribution — the debug key must never ship publicly.
+            signingConfig = signingConfigs.getByName("debug")
+            ndk {
+                // Release ships to real phones only — all of which are
+                // arm64-v8a. x86_64 exists for emulators (kept in debug),
+                // so dropping it here saves ~22 MB of native libs with
+                // zero impact on real users.
+                abiFilters += "arm64-v8a"
+            }
         }
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            ndk {
+                // Keep x86_64 in debug so x86_64 emulators can still install.
+                abiFilters += listOf("arm64-v8a", "x86_64")
+            }
         }
     }
 
@@ -61,12 +71,6 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
-    }
-
-    androidResources {
-        // The Vosk model ZIP is already compressed; AAPT re-deflating it just
-        // burns CPU at install time and produces no size savings. Keep it raw.
-        noCompress += "zip"
     }
 }
 
@@ -120,6 +124,9 @@ dependencies {
     // Vosk on-device speech-to-text (for 語音辨識)
     implementation(libs.vosk.android)
     implementation(libs.jna) { artifact { type = "aar" } }
+
+    // OpenCC4j — Vosk 中文模型輸出簡體，轉成繁體後才能比對台灣詐騙目錄
+    implementation(libs.opencc4j)
 
     // Test
     testImplementation(libs.junit)
