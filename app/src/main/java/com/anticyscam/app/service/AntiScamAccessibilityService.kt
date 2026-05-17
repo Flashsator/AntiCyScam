@@ -10,7 +10,6 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.Button
 import android.widget.TextView
-import com.anticyscam.app.MainActivity
 import com.anticyscam.app.R
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -136,20 +135,13 @@ class AntiScamAccessibilityService : AccessibilityService() {
             // user tapping the same bound app twice from launcher silently
             // bypasses the block (same-package back-to-back returns Ignore).
             guard.resetLastObserved()
-            // Plan v4 Item 1: removeOverlay alone leaves the bound app in
-            // foreground — the user thinks "我知道了" sent them home but
-            // they actually land back inside the bank app. Force MainActivity
-            // to the front. BAL doesn't apply: this startActivity is fired
-            // synchronously from a user click on the overlay, which counts
-            // as user activation.
-            val mainIntent = Intent(this, MainActivity::class.java).apply {
-                addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP
-                )
-            }
-            runCatching { startActivity(mainIntent) }
+            // 需求 #2：使用者只要進不去網銀 App 就好 —— 警告必須「關不掉、
+            // 持續重跳」。removeOverlay 單獨用會把使用者留在網銀 App 前景，
+            // 改開 MainActivity 在部分 OEM 上仍可被 back 鍵退回網銀。
+            // performGlobalAction(GLOBAL_ACTION_HOME) 是唯一能在所有 OEM 上
+            // 確實把網銀 App 踢出前景的方式；使用者之後若再點網銀，會觸發
+            // 新的 WINDOW_STATE_CHANGED → guard 再次 Block → 警告重跳。
+            performGlobalAction(GLOBAL_ACTION_HOME)
         }
 
         val params = WindowManager.LayoutParams(

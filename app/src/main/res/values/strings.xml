@@ -53,24 +53,22 @@
     <string name="device_admin_description">啟用後可避免防詐器被誤刪除，提高保護完整性。可隨時於系統設定中關閉。</string>
     <string name="device_admin_disable_warning">關閉裝置管理員將解除防詐器的防誤刪保護。建議保持開啟以確保功能完整。</string>
 
-    <!-- Main-function tab inline gate (requirement #3, revised) -->
-    <string name="gate_inline_title">啟用防詐器保護</string>
-    <string name="gate_inline_subtitle">以下四項全部啟用後，才能使用防詐器轉帳保護功能</string>
+    <!-- Shared protection-feature strings (used by 設定 toggles) -->
     <string name="gate_item_a11y">無障礙服務</string>
     <string name="gate_item_a11y_desc">攔截綁定 App 的直接開啟並提醒</string>
-    <string name="gate_item_admin">裝置管理員</string>
-    <string name="gate_item_admin_desc">防止防詐器被誤刪除</string>
-    <string name="gate_item_notify">通知權限</string>
-    <string name="gate_item_notify_desc">顯示「防詐器保護中」常駐通知</string>
-    <string name="gate_item_battery">電池白名單</string>
-    <string name="gate_item_battery_desc">允許防詐器背景持續執行，不被省電強制關閉</string>
-    <string name="gate_battery_hint">點下後系統會彈出對話框詢問是否允許「不受電池優化」，請選「允許」</string>
     <string name="gate_action_enable">前往啟用</string>
     <string name="gate_status_on">已啟用</string>
-    <string name="gate_all_ready_hint">四項全部啟用後，畫面會自動切換為防詐器主功能</string>
-    <string name="gate_admin_fallback_hint">此版本系統未提供「啟用裝置管理員」直接入口，請手動點選：設定 → 安全 → 裝置管理員應用程式 → 開啟「防詐器」</string>
     <string name="gate_accessibility_open_hint">若沒看到「防詐器」開關，請在清單中向下捲動找「防詐器保護服務」</string>
     <string name="gate_launch_failed">無法開啟系統設定（%1$s），請手動到 設定 App 內開啟</string>
+
+    <!-- 設定頁：防詐器保護開關（無障礙服務 + 通知） -->
+    <string name="setting_protection_title">防詐器保護設定</string>
+    <string name="setting_feature_a11y_desc">開啟後，偵測到您開啟已綁定的網銀 App 時，會立即跳出全螢幕警告並持續攔截，是最強的保護模式。未開啟仍會以通知與偵測方式提醒。</string>
+    <string name="setting_feature_notify">防詐通知</string>
+    <string name="setting_feature_notify_desc">開啟後，已綁定 App 受保護時，會在通知列顯示「防詐器保護中」常駐通知，讓您隨時掌握保護狀態。</string>
+    <string name="setting_feature_notify_no_app">尚未綁定任何 App，通知暫不顯示；綁定第一個 App 後才會啟用。</string>
+    <string name="setting_feature_usage">使用情況存取權</string>
+    <string name="setting_feature_usage_desc">未開啟無障礙服務時，防詐器改以此權限偵測您是否開啟已綁定的網銀 App，偵測到時跳出全螢幕警告。此為後備保護，反應比無障礙服務略慢；建議優先開啟上方無障礙服務。</string>
 
     <!-- Voice recognition: jump to dialer call-recording settings -->
     <string name="voice_open_call_recording_settings">前往通話錄音設定</string>

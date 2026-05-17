@@ -123,13 +123,12 @@ fun SettingScreen() {
             item {
                 ProtectionStatusCard(
                     a11yEnabled = status.accessibilityEnabled,
-                    deviceAdminActive = status.deviceAdminActive,
                     notificationsEnabled = status.notificationsEnabled,
-                    batteryIgnored = status.batteryOptimizationIgnored,
+                    usageStatsGranted = status.usageStatsGranted,
+                    boundAppCount = status.boundAppCount,
                     onOpenA11y = viewModel::openAccessibilitySettings,
-                    onOpenDeviceAdmin = viewModel::openDeviceAdminSettings,
-                    onOpenNotifications = viewModel::openNotificationSettings,
-                    onOpenBattery = viewModel::requestBatteryExemption
+                    onOpenNotification = viewModel::openNotificationSettings,
+                    onOpenUsageAccess = viewModel::openUsageAccessSettings
                 )
             }
             item {
@@ -178,19 +177,29 @@ fun SettingScreen() {
     }
 }
 
+/**
+ * 防詐器保護設定卡（需求 #3、#4）。
+ *
+ * 系統權限開關：無障礙服務、防詐通知。Android 不允許 App 直接代開這些系統
+ * 權限，因此「開關」實際是狀態列 + 「前往啟用」捷徑，點下後跳系統設定。
+ * 每項下方附說明文字解釋開啟後的效果；通知在「尚未綁定任何 App」時即使已授權
+ * 也不會顯示，因此額外提示使用者先綁定 App。
+ *
+ * 當無障礙服務未啟用時，額外顯示「使用情況存取權」區塊：這是 a11y-OFF 後備
+ * 偵測（[com.anticyscam.app.service.UsageStatsForegroundDetector]）所需的特殊
+ * 權限。a11y 一旦啟用即為最強模式，後備偵測停用，此區塊隱藏。
+ */
 @Composable
 private fun ProtectionStatusCard(
     a11yEnabled: Boolean,
-    deviceAdminActive: Boolean,
     notificationsEnabled: Boolean,
-    batteryIgnored: Boolean,
+    usageStatsGranted: Boolean,
+    boundAppCount: Int,
     onOpenA11y: () -> Unit,
-    onOpenDeviceAdmin: () -> Unit,
-    onOpenNotifications: () -> Unit,
-    onOpenBattery: () -> Unit
+    onOpenNotification: () -> Unit,
+    onOpenUsageAccess: () -> Unit
 ) {
-    val allOn = a11yEnabled && deviceAdminActive && notificationsEnabled && batteryIgnored
-    val borderColor = if (allOn) SuccessGreen else AlertYellow
+    val borderColor = if (a11yEnabled) SuccessGreen else AlertYellow
     val border = remember(borderColor) { BorderStroke(1.dp, borderColor) }
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -200,51 +209,76 @@ private fun ProtectionStatusCard(
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    imageVector = if (allOn) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                    imageVector =
+                        if (a11yEnabled) Icons.Filled.CheckCircle else Icons.Filled.Warning,
                     contentDescription = null,
                     tint = borderColor
                 )
                 Text(
-                    text = "防詐器保護狀態",
+                    text = stringResource(R.string.setting_protection_title),
                     color = TextPrimary,
                     style = MaterialTheme.typography.titleMedium
                 )
             }
-            Text(
-                text = if (allOn) {
-                    "四項保護全部已啟用，防詐器正在守護您的轉帳安全。"
-                } else {
-                    "下方未啟用的項目，請點「前往啟用」開啟。"
-                },
-                color = TextSecondary,
-                style = MaterialTheme.typography.bodySmall
-            )
-            ProtectionFeatureRow(
+            ProtectionFeatureBlock(
                 label = stringResource(R.string.gate_item_a11y),
+                description = stringResource(R.string.setting_feature_a11y_desc),
                 enabled = a11yEnabled,
                 onOpen = onOpenA11y
             )
-            ProtectionFeatureRow(
-                label = stringResource(R.string.gate_item_admin),
-                enabled = deviceAdminActive,
-                onOpen = onOpenDeviceAdmin
-            )
-            ProtectionFeatureRow(
-                label = stringResource(R.string.gate_item_notify),
+            if (!a11yEnabled) {
+                ProtectionFeatureBlock(
+                    label = stringResource(R.string.setting_feature_usage),
+                    description = stringResource(R.string.setting_feature_usage_desc),
+                    enabled = usageStatsGranted,
+                    onOpen = onOpenUsageAccess
+                )
+            }
+            ProtectionFeatureBlock(
+                label = stringResource(R.string.setting_feature_notify),
+                description = stringResource(R.string.setting_feature_notify_desc),
                 enabled = notificationsEnabled,
-                onOpen = onOpenNotifications
+                onOpen = onOpenNotification,
+                extraHint = if (notificationsEnabled && boundAppCount == 0) {
+                    stringResource(R.string.setting_feature_notify_no_app)
+                } else {
+                    null
+                }
             )
-            ProtectionFeatureRow(
-                label = stringResource(R.string.gate_item_battery),
-                enabled = batteryIgnored,
-                onOpen = onOpenBattery
+        }
+    }
+}
+
+/**
+ * 單一保護功能區塊：狀態列 +「開啟後效果」說明文字 + 選用的額外提示。
+ */
+@Composable
+private fun ProtectionFeatureBlock(
+    label: String,
+    description: String,
+    enabled: Boolean,
+    onOpen: () -> Unit,
+    extraHint: String? = null
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        ProtectionFeatureRow(label = label, enabled = enabled, onOpen = onOpen)
+        Text(
+            text = description,
+            color = TextSecondary,
+            style = MaterialTheme.typography.bodySmall
+        )
+        if (extraHint != null) {
+            Text(
+                text = extraHint,
+                color = AlertYellow,
+                style = MaterialTheme.typography.bodySmall
             )
         }
     }

@@ -64,6 +64,10 @@ class SettingViewModel @Inject constructor(
         AccessibilityChecker.isNotificationsEnabled(appContext)
     )
 
+    private val usageStatsGranted = MutableStateFlow(
+        AccessibilityChecker.hasUsageStatsPermission(appContext)
+    )
+
     val status: StateFlow<SettingStatus> = combine(
         boundAppRepository.observeBoundApps().map { it.size },
         transferAccountRepository.observeAccounts().map { list ->
@@ -73,7 +77,8 @@ class SettingViewModel @Inject constructor(
         batteryIgnored,
         overlayGranted,
         deviceAdminActive,
-        notificationsEnabled
+        notificationsEnabled,
+        usageStatsGranted
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         SettingStatus(
@@ -83,7 +88,8 @@ class SettingViewModel @Inject constructor(
             batteryOptimizationIgnored = values[3] as Boolean,
             overlayPermissionGranted = values[4] as Boolean,
             deviceAdminActive = values[5] as Boolean,
-            notificationsEnabled = values[6] as Boolean
+            notificationsEnabled = values[6] as Boolean,
+            usageStatsGranted = values[7] as Boolean
         )
     }.stateIn(
         scope = viewModelScope,
@@ -125,6 +131,7 @@ class SettingViewModel @Inject constructor(
         overlayGranted.value = AccessibilityChecker.canDrawOverlays(appContext)
         deviceAdminActive.value = AccessibilityChecker.isDeviceAdminActive(appContext)
         notificationsEnabled.value = AccessibilityChecker.isNotificationsEnabled(appContext)
+        usageStatsGranted.value = AccessibilityChecker.hasUsageStatsPermission(appContext)
     }
 
     fun openDeviceAdminSettings() {
@@ -138,6 +145,15 @@ class SettingViewModel @Inject constructor(
 
     fun openAccessibilitySettings() {
         AccessibilityChecker.launchA11ySettings(appContext)
+    }
+
+    /**
+     * 開啟「使用情況存取權」設定頁。a11y 未開啟時，[UsageStatsForegroundDetector]
+     * 後備偵測需要此特殊權限才能輪詢前景 App。
+     */
+    fun openUsageAccessSettings() {
+        val intent = AccessibilityChecker.openUsageAccessSettingsIntent(appContext.packageName)
+        runCatching { appContext.startActivity(intent) }
     }
 
     /**
@@ -183,7 +199,8 @@ class SettingViewModel @Inject constructor(
         val batteryOptimizationIgnored: Boolean = false,
         val overlayPermissionGranted: Boolean = false,
         val deviceAdminActive: Boolean = false,
-        val notificationsEnabled: Boolean = false
+        val notificationsEnabled: Boolean = false,
+        val usageStatsGranted: Boolean = false
     )
 
     data class CatalogMeta(

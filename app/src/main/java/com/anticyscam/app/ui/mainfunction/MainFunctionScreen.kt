@@ -35,7 +35,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -54,15 +53,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.anticyscam.app.R
 import com.anticyscam.app.domain.model.BoundApp
 import com.anticyscam.app.domain.model.TransferAccount
 import com.anticyscam.app.domain.model.TransferAccountState
-import com.anticyscam.app.ui.gate.AccessibilityGateScreen
-import com.anticyscam.app.ui.gate.AccessibilityGateViewModel
 import com.anticyscam.app.ui.lockdown.DailyAddLockActivity
 import com.anticyscam.app.ui.tempuse.TempUseGateActivity
 import com.anticyscam.app.ui.theme.AlertYellow
@@ -87,21 +81,6 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
-    val gateViewModel: AccessibilityGateViewModel = hiltViewModel()
-    val gateState by gateViewModel.state.collectAsState()
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) gateViewModel.refresh()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-    if (!gateState.allRequirementsMet) {
-        AccessibilityGateScreen(state = gateState)
-        return
-    }
-
     val transferViewModel: TransferAccountViewModel = hiltViewModel()
     val mainViewModel: MainFunctionViewModel = hiltViewModel()
     val uiList by transferViewModel.uiList.collectAsState()

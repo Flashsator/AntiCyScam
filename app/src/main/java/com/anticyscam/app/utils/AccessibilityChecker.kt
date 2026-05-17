@@ -2,12 +2,14 @@ package com.anticyscam.app.utils
 
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.annotation.SuppressLint
+import android.app.AppOpsManager
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.PowerManager
+import android.os.Process
 import android.provider.Settings
 import android.text.TextUtils
 import android.util.Log
@@ -154,6 +156,38 @@ object AccessibilityChecker {
 
     fun openOverlayPermissionIntent(packageName: String): Intent =
         Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+            data = Uri.parse("package:$packageName")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+    /**
+     * 是否已授予 PACKAGE_USAGE_STATS（使用情況存取）特殊權限。需求 #2 的
+     * a11y-OFF 後備偵測 [UsageStatsForegroundDetector] 靠 `UsageStatsManager`
+     * 輪詢前景 App，沒有此權限 `queryEvents` 一律回空。
+     *
+     * 此權限無法用 runtime request 取得，只能由使用者在「使用情況存取權」
+     * 設定頁手動開啟，因此用 [AppOpsManager] 查授權狀態 —— 一般 permission
+     * 檢查 API 對特殊存取權無效。
+     */
+    fun hasUsageStatsPermission(context: Context): Boolean {
+        val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as? AppOpsManager
+            ?: return false
+        val mode = runCatching {
+            appOps.unsafeCheckOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                Process.myUid(),
+                context.packageName
+            )
+        }.getOrDefault(AppOpsManager.MODE_ERRORED)
+        return mode == AppOpsManager.MODE_ALLOWED
+    }
+
+    /**
+     * 開啟「使用情況存取權」系統設定頁。帶上 package URI 讓多數 ROM 直接
+     * 捲到本 App；少數舊 ROM 不吃 data，會落到清單頁，使用者需手動點「防詐器」。
+     */
+    fun openUsageAccessSettingsIntent(packageName: String): Intent =
+        Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
             data = Uri.parse("package:$packageName")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }

@@ -60,7 +60,19 @@ class ForegroundAppGuard @Inject constructor(
     @Volatile
     private var authorizedSessionPackage: String? = null
 
+    @Volatile
+    private var started = false
+
+    /**
+     * Idempotent. Both [AntiScamAccessibilityService] (a11y-ON path) and
+     * [AntiScamForegroundService]'s [UsageStatsForegroundDetector] (a11y-OFF
+     * path) call this; whichever runs first populates the snapshot, the
+     * second call is a no-op so the repository flow is collected only once.
+     */
+    @Synchronized
     fun start() {
+        if (started) return
+        started = true
         boundAppRepository.observeBoundApps()
             .onEach { apps ->
                 _snapshot.value = apps.associate { it.packageName to it.label }

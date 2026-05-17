@@ -5,6 +5,14 @@
     <!-- Required for fullscreen overlay warning ("請從防詐器進入") -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
+    <!-- a11y-OFF fallback: UsageStatsForegroundDetector polls the foreground app
+         via UsageStatsManager when the AccessibilityService is not enabled.
+         Special-access permission — granted only via the system "Usage access"
+         settings page, never at runtime. -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
     <!-- Battery-optimization whitelist request (Phase 3, Android 12 reliability fix).
          Without this, OEM doze can kill the AccessibilityService silently. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />

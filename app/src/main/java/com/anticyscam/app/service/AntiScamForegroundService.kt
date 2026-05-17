@@ -44,24 +44,35 @@ class AntiScamForegroundService : Service() {
 
     @Inject lateinit var boundAppRepository: BoundAppRepository
     @Inject lateinit var clock: AntiScamClock
+    @Inject lateinit var foregroundAppGuard: ForegroundAppGuard
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var watchdogJob: Job? = null
+    // 已綁定 App 數的快取 — 由 onCreate 啟動的 bound-app collector 持續更新，
+    // 供 [enforceProtectionState] 在 watchdog tick 同步讀取。
+    @Volatile private var boundAppCount = 0
     // 通話結束自動偵測 → 掃 OEM 錄音檔 → 通知使用者送進辨識流程
     private val callRecordingDetector by lazy { CallRecordingDetector(this) }
+    // a11y-OFF 後備前景偵測（UsageStats 輪詢）。與無障礙服務互斥，由
+    // [updateDetectionMode] 依無障礙服務開關狀態啟動／停止。
+    private val usageStatsDetector by lazy {
+        UsageStatsForegroundDetector(this, foregroundAppGuard)
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         ensureChannel()
-        // 需求 #4：通知欄「防詐器保護中」只允許在三項條件全綠時出現。
-        // 啟動瞬間先以低重要性 placeholder 滿足 startForeground 義務，再把守門
-        // 邏輯交給 [enforceProtectionState] 決定要不要 stopSelf。
+        // 啟動瞬間先以低重要性 placeholder 通知滿足 startForeground 義務；真正
+        // 的守門交給下方 bound-app collector —— 等第一次 DB emission 帶回真實
+        // 綁定數後才決定要不要 stopSelf，避免「冷啟動時 count 仍是 0」的誤判。
         startForegroundCompat()
-        if (!enforceProtectionState()) return
-        startWatchdog()
         callRecordingDetector.start()
+        // 確保前景判決核心的綁定 App 快照被填入 —— a11y 關閉時無障礙服務不會
+        // 呼叫 start()，UsageStats 後備偵測就會拿到空快照。start() 為冪等。
+        foregroundAppGuard.start()
+        observeBoundAppsAndEnforce()
         // Safety-net settle: BootReceiver also does this, but the service is
         // also restarted by Android after process death without a reboot —
         // catching that path is why we settle here too. Cheap when no rows.
@@ -73,17 +84,55 @@ class AntiScamForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         ensureChannel()
+        // 守門與 watchdog 由 onCreate 啟動的 bound-app collector 負責；redeliver
+        // 時 collector 仍存活，此處只需重新宣告前景狀態。
         startForegroundCompat()
-        if (!enforceProtectionState()) return START_NOT_STICKY
-        startWatchdog()
         return START_STICKY
+    }
+
+    /**
+     * 訂閱已綁定 App 清單。每次變動都更新 [boundAppCount] 並重跑守門檢查 ——
+     * 綁定數歸零（使用者解除最後一個 App）時 [enforceProtectionState] 會
+     * stopSelf，落實「未綁定 App 不顯示通知」（需求 #4）。
+     */
+    private fun observeBoundAppsAndEnforce() {
+        scope.launch {
+            boundAppRepository.observeBoundApps().collect { apps ->
+                boundAppCount = apps.size
+                if (!enforceProtectionState()) return@collect
+                startWatchdog()
+                updateDetectionMode()
+                refreshNotificationFromStatus()
+            }
+        }
     }
 
     override fun onDestroy() {
         watchdogJob?.cancel()
         callRecordingDetector.destroy()
+        usageStatsDetector.stop()
         scope.cancel()
         super.onDestroy()
+    }
+
+    /**
+     * 依無障礙服務開關狀態切換前景偵測模式（需求 #2、#5）：
+     *  - a11y 開啟 → [AntiScamAccessibilityService] 以即時事件攔截，UsageStats
+     *    後備偵測必須停掉，否則兩者共用 [ForegroundAppGuard]、會重複跳警告。
+     *  - a11y 關閉 → 沒有即時回呼，啟動 [UsageStatsForegroundDetector] 輪詢，
+     *    但前提是 PACKAGE_USAGE_STATS 與懸浮窗權限都已授權；缺一不可就停掉。
+     * 冪等：detector 的 start／stop 重複呼叫皆為 no-op，可安全於 watchdog 反覆呼叫。
+     */
+    private fun updateDetectionMode() {
+        val a11yOn = AccessibilityChecker.isOurServiceEnabled(this)
+        val canFallback = !a11yOn &&
+            AccessibilityChecker.hasUsageStatsPermission(this) &&
+            AccessibilityChecker.canDrawOverlays(this)
+        if (canFallback) {
+            usageStatsDetector.start(scope)
+        } else {
+            usageStatsDetector.stop()
+        }
     }
 
     private fun ensureChannel() {
@@ -125,6 +174,9 @@ class AntiScamForegroundService : Service() {
                 delay(WATCHDOG_INTERVAL_MS)
                 runCatching {
                     if (!enforceProtectionState()) return@launch
+                    // a11y 服務可能在執行期間被使用者開啟／關閉 —— 每個 tick
+                    // 重新評估，必要時切換 UsageStats 後備偵測的啟停。
+                    updateDetectionMode()
                     refreshNotificationFromStatus()
                     // 處理使用者後來給/收回 READ_PHONE_STATE / READ_MEDIA_AUDIO 的情況
                     callRecordingDetector.refreshIfNeeded()
@@ -134,18 +186,19 @@ class AntiScamForegroundService : Service() {
     }
 
     /**
-     * 三項守門檢查 — 任一不符就 stopSelf。v1 邏輯刻意保持簡單：使用者必須先把
-     * 四項都打開才有保護，少一項就把服務拉下、讓 App 進入 gate 狀態。
+     * 守門檢查 — 需求 #3、#4：常駐通知「防詐器保護中」只在「通知權限已授權」
+     * 且「已綁定至少一個 App」時存在。未綁定 App 時顯示通知沒有保護目標，
+     * 因此 stopSelf。無障礙服務／裝置管理員為選用的進階保護，不再作為服務
+     * 存活條件。
      */
     private fun enforceProtectionState(): Boolean {
-        val a11yEnabled = AccessibilityChecker.isOurServiceEnabled(this)
-        val adminActive = AccessibilityChecker.isDeviceAdminActive(this)
         val notifyEnabled = AccessibilityChecker.isNotificationsEnabled(this)
-        if (a11yEnabled && adminActive && notifyEnabled) return true
+        val hasBoundApp = boundAppCount > 0
+        if (notifyEnabled && hasBoundApp) return true
         Log.i(
             TAG,
-            "Protection requirements not all met (a11y=$a11yEnabled, " +
-                "admin=$adminActive, notify=$notifyEnabled) — stopping service"
+            "Protection notification not warranted (notify=$notifyEnabled, " +
+                "boundApps=$boundAppCount) — stopping service"
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -164,18 +217,17 @@ class AntiScamForegroundService : Service() {
     }
 
     /**
-     * 此 service 只在三項條件全綠時存活（由 [enforceProtectionState] 守門），
-     * 因此正常情況下文字一律是「防詐器保護中」。仍保留 a11y 連線狀態與電池
-     * 白名單兩項可觀察的健康欄位作為更細的回饋（會在 watchdog tick 之間自然
-     * 漂移；若使用者在系統設定關閉了任一三項條件，下一次 tick 直接 stopSelf）。
+     * 此 service 只在「通知權限已授權 + 已綁定 App」時存活（由
+     * [enforceProtectionState] 守門），正常文字一律是「防詐器保護中」。
+     * 電池白名單未加入時背景可能被系統關閉，因此額外提示；無障礙服務為選用
+     * 進階保護，不在此處作為警告條件。
      */
     private fun currentStatusText(): String {
-        val alive = AntiScamAccessibilityService.isAlive.value
         val batteryOk = AccessibilityChecker.isBatteryOptimizationIgnored(this)
-        return when {
-            !alive -> "⚠ 服務未連線 — 請重新啟動 App"
-            !batteryOk -> "⚠ 未加電池白名單 — 背景時可能被系統關閉"
-            else -> getString(R.string.foreground_service_text)
+        return if (batteryOk) {
+            getString(R.string.foreground_service_text)
+        } else {
+            "⚠ 未加電池白名單 — 背景時可能被系統關閉"
         }
     }
 

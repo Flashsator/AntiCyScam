@@ -23,8 +23,8 @@ import com.anticyscam.app.data.prefs.AntiScamClock
 import com.anticyscam.app.service.AntiScamForegroundService
 import com.anticyscam.app.ui.appupdate.AppUpdateDialog
 import com.anticyscam.app.ui.catalog.CatalogUpdateDialog
-import com.anticyscam.app.ui.gate.AccessibilityGateViewModel
 import com.anticyscam.app.ui.main.MainScreen
+import com.anticyscam.app.ui.main.ProtectionStateViewModel
 import com.anticyscam.app.ui.theme.AntiCyScamTheme
 import com.anticyscam.app.ui.theme.SurfaceBlack
 import dagger.hilt.android.AndroidEntryPoint
@@ -33,21 +33,21 @@ import javax.inject.Inject
 /**
  * Single-Activity host.
  *
- * Behavior change (requirement #3 revised):
- *   - The accessibility/device-admin/notification gate no longer blocks the
- *     whole app. The user can always enter [MainScreen] and use the 詐騙專區
- *     and 設定 tabs.
- *   - The 防詐器 tab itself renders an inline gate inside [MainFunctionScreen]
- *     when the three requirements are not all met.
- *   - The "防詐器保護中" foreground notification is only allowed to appear when
- *     all three requirements hold; we drive the service start/stop from the
- *     observed gate state here. The service also self-checks on each tick so a
- *     stale state still resolves correctly.
+ * Behavior change (測試版彈性限制):
+ *   - There is no gate. The user can always enter [MainScreen] and use the
+ *     防詐器、詐騙專區、設定 tabs directly.
+ *   - 無障礙服務 and 通知 are optional protections enabled from the 設定 tab;
+ *     they do not gate anything.
+ *   - The "防詐器保護中" foreground notification runs once notification
+ *     permission is granted **and** at least one App is bound. We drive the
+ *     service start/stop from [ProtectionStateViewModel.shouldRunService].
+ *     The service also self-checks on each tick so a stale state still
+ *     resolves correctly.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    private val gateViewModel: AccessibilityGateViewModel by viewModels()
+    private val protectionViewModel: ProtectionStateViewModel by viewModels()
 
     @Inject lateinit var clock: AntiScamClock
 
@@ -58,9 +58,9 @@ class MainActivity : ComponentActivity() {
     private val requestNotificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {
-        // Either outcome is fine — the gate will reflect the new state on
-        // the next refresh and re-evaluate the foreground notification.
-        gateViewModel.refresh()
+        // Either outcome is fine — refresh re-reads the notification state
+        // and re-evaluates whether the foreground notification should run.
+        protectionViewModel.refresh()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,14 +74,14 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             AntiCyScamTheme {
-                val state by gateViewModel.state.collectAsState()
+                val shouldRunService by protectionViewModel.shouldRunService.collectAsState()
                 val catalogState by catalogUpdateChecker.state.collectAsState()
                 val appUpdateState by appUpdateChecker.state.collectAsState()
-                // Start/stop the foreground service from the observed gate
-                // state. Requirement #4: only show "防詐器保護中" notification
-                // when all three requirements are satisfied.
-                LaunchedEffect(state.allRequirementsMet) {
-                    if (state.allRequirementsMet) {
+                // Start/stop the foreground service from the observed state.
+                // The "防詐器保護中" notification runs once notification
+                // permission is granted and at least one App is bound.
+                LaunchedEffect(shouldRunService) {
+                    if (shouldRunService) {
                         AntiScamForegroundService.start(applicationContext)
                     } else {
                         stopService(
@@ -119,7 +119,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        gateViewModel.refresh()
+        protectionViewModel.refresh()
     }
 
     private fun maybeRequestPostNotificationsPermission() {
