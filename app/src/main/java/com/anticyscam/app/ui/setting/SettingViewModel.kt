@@ -8,7 +8,6 @@ import com.anticyscam.app.data.catalog.CatalogUpdateChecker
 import com.anticyscam.app.data.repository.BoundAppRepository
 import com.anticyscam.app.data.repository.ScamInfoRepository
 import com.anticyscam.app.data.repository.TransferAccountRepository
-import com.anticyscam.app.service.AntiScamAccessibilityService
 import com.anticyscam.app.service.ForegroundAppGuard
 import com.anticyscam.app.ui.warning.BlockingWarningActivity
 import com.anticyscam.app.utils.AccessibilityChecker
@@ -96,9 +95,6 @@ class SettingViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = SettingStatus()
     )
-
-    /** Service-alive heartbeat (onServiceConnected has fired). */
-    val accessibilityServiceAlive: StateFlow<Boolean> = AntiScamAccessibilityService.isAlive
 
     /** Decision counters + last event from [ForegroundAppGuard]. */
     val diagnostic: StateFlow<ForegroundAppGuard.Diagnostic> = foregroundAppGuard.diagnostic

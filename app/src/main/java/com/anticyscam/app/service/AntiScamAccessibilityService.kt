@@ -72,7 +72,16 @@ class AntiScamAccessibilityService : AccessibilityService() {
             AccessibilityEvent.TYPE_WINDOWS_CHANGED -> Unit
             else -> return
         }
-        val pkg = event.packageName?.toString() ?: return
+        // TYPE_WINDOW_STATE_CHANGED carries the package directly. The
+        // gesture-nav quick-switch of an already-resident app, however,
+        // usually only fires TYPE_WINDOWS_CHANGED, whose packageName is
+        // almost always null — dropping it here would silently miss the
+        // switch back into a bound app. Fall back to the active window's
+        // root package (needs canRetrieveWindowContent=true in the
+        // service config) so those switches are still evaluated.
+        val pkg = event.packageName?.toString()
+            ?: rootInActiveWindow?.packageName?.toString()
+            ?: return
 
         // Ignore the obvious system-UI noise; system_ui and launcher
         // bounce between every transition. The guard also filters but
@@ -130,10 +139,9 @@ class AntiScamAccessibilityService : AccessibilityService() {
         }
         root.findViewById<Button>(R.id.overlay_dismiss).setOnClickListener {
             removeOverlay()
-            // Clear the dedup gate so the next foreground event for the
-            // same bound app re-triggers the warning. Without this, the
-            // user tapping the same bound app twice from launcher silently
-            // bypasses the block (same-package back-to-back returns Ignore).
+            // Reset session tracking so a stale authorized session cannot
+            // carry the user back into the bound app without re-entering
+            // through 防詐器.
             guard.resetLastObserved()
             // 需求 #2：使用者只要進不去網銀 App 就好 —— 警告必須「關不掉、
             // 持續重跳」。removeOverlay 單獨用會把使用者留在網銀 App 前景，

@@ -56,6 +56,7 @@ captures/
 .idea/deploymentTargetSelector.xml
 .idea/deviceManager.xml
 .idea/kotlinc.xml
+.idea/appInsightsSettings.xml
 
 # Keystore files
 *.jks

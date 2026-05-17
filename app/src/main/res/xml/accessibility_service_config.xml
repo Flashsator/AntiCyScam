@@ -1,19 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Accessibility service configuration. Phase 1 lays down a minimal config so
-  the manifest validates and the gate screen can detect enablement; the
-  actual event handling is implemented in Phase 7.
+  Accessibility service configuration. Drives the foreground-app watcher
+  that blocks unauthorized entry into bound apps.
 
-  Note: canRetrieveWindowContent is kept FALSE during Phase 1 to make the
-  Play Console permission declaration tractable. It can be enabled later if
-  the implementation truly needs window text scraping — which the current
-  design does not (we only need foreground package transitions).
+  canRetrieveWindowContent is TRUE: the gesture-nav quick-switch into an
+  already-resident app fires TYPE_WINDOWS_CHANGED with a null packageName,
+  so the service falls back to rootInActiveWindow.packageName to identify
+  the foreground app. Only the package name is read — no window text is
+  scraped. (The app is distributed as a sideloaded APK, not via Play, so
+  the earlier Play Console declaration concern no longer applies.)
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged|typeWindowsChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagDefault|flagRetrieveInteractiveWindows"
-    android:canRetrieveWindowContent="false"
+    android:canRetrieveWindowContent="true"
     android:description="@string/accessibility_service_description"
     android:notificationTimeout="100"
     android:summary="@string/accessibility_service_label" />

@@ -48,14 +48,17 @@ class ForegroundAppGuard @Inject constructor(
     /**
      * The bound package currently treated as the user's active session.
      * Set when [evaluate] first consumes an authorization for a bound app;
-     * cleared when [evaluate] observes a *different* non-system package
-     * surfacing in the foreground (i.e. the user genuinely switched away).
+     * cleared as soon as [evaluate] observes any *different* package (bound
+     * or non-bound) surfacing in the foreground — that counts as the user
+     * leaving the protected flow, so re-entering the bound app afterwards
+     * must go through 防詐器 again or it is blocked.
      *
-     * While this is set, repeated foreground events for the same package —
-     * including in-app window transitions and brief overlays from
-     * SystemUI / IME / OTP toasts — short-circuit to AllowAuthorized
-     * without consuming another grant, so a mid-session warning cannot
-     * be triggered by transient system noise.
+     * While it is set, repeated foreground events for the *same* package —
+     * i.e. in-app window transitions within the bound app — short-circuit
+     * to AllowAuthorized without consuming another grant, so mid-session
+     * window churn cannot re-trigger the warning. True transient system
+     * overlays (SystemUI, etc.) never reach [evaluate]: they are filtered
+     * by IGNORED_PACKAGES in AntiScamAccessibilityService.
      */
     @Volatile
     private var authorizedSessionPackage: String? = null
@@ -81,10 +84,11 @@ class ForegroundAppGuard @Inject constructor(
     }
 
     /**
-     * Clear the dedup gate so the next [evaluate] for the previously-seen
-     * package re-triggers the warning. Call after the user dismisses an
-     * overlay block, otherwise repeatedly tapping the same bound app from
-     * launcher results in Ignore (same-package back-to-back).
+     * Reset the session-tracking state — the last-seen package and the
+     * active authorized session. Called after the user dismisses an overlay
+     * block so the next foreground event is evaluated from a clean slate:
+     * no stale authorized session can carry the user back into a bound app
+     * without re-authorizing through 防詐器.
      */
     fun resetLastObserved() {
         lastObservedPackage = null
@@ -107,17 +111,22 @@ class ForegroundAppGuard @Inject constructor(
      * Session model:
      *  - Our own UI is always Ignored — we never block ourselves.
      *  - Non-bound foregrounds (LINE / Launcher / system apps / OEM
-     *    surfaces, etc.) are Ignored, but they advance the dedup gate.
-     *    A non-bound foreground that is also a *different package* from
-     *    the last one we saw counts as the user truly leaving the bound
-     *    app and ends the active session.
+     *    surfaces, etc.) are Ignored. A non-bound foreground that is also
+     *    a *different package* from the last one we saw counts as the user
+     *    truly leaving the bound app and ends the active session.
      *  - Bound foregrounds:
-     *      * Same package as the previous event → Ignore (dedup).
      *      * Same package as the active session → AllowAuthorized without
      *        consuming a new grant. This is what keeps mid-session window
      *        transitions / IME / OTP toasts from re-triggering the warning.
      *      * Otherwise → consume a pending authorization. Success opens a
      *        new session; failure clears any stale session and blocks.
+     *
+     * There is deliberately NO same-package dedup: an unauthorized re-entry
+     * into a bound app (e.g. a gesture-nav quick-switch back to a bank app)
+     * looks identical to the previous event, so deduping it would silently
+     * skip the warning. Legitimate in-app transitions are already covered
+     * by the authorized-session branch, and duplicate overlays are
+     * prevented downstream by an overlayView null-check.
      */
     fun evaluate(foregroundPkg: String, ownPkg: String): Decision {
         if (foregroundPkg == ownPkg) {
@@ -141,9 +150,7 @@ class ForegroundAppGuard @Inject constructor(
             return d
         }
 
-        val last = lastObservedPackage
         val decision: Decision = when {
-            foregroundPkg == last -> Decision.Ignore
             foregroundPkg == authorizedSessionPackage ->
                 Decision.AllowAuthorized(foregroundPkg)
             authorizedLaunchTracker.consumeAuthorization(foregroundPkg) -> {

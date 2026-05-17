@@ -118,7 +118,7 @@ class UsageStatsForegroundDetector(
             }
             root.findViewById<Button>(R.id.overlay_dismiss).setOnClickListener {
                 removeOverlay()
-                // Clear the dedup gate so the next poll re-evaluates the
+                // Reset session tracking so the next poll re-evaluates the
                 // still-foreground bank app and re-pops the warning.
                 guard.resetLastObserved()
                 // Fired from a user tap → counts as user activation, so the

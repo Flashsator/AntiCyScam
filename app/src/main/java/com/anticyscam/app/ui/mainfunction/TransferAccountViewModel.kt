@@ -1,5 +1,7 @@
 package com.anticyscam.app.ui.mainfunction
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,6 +13,7 @@ import com.anticyscam.app.data.prefs.TempUseTracker
 import com.anticyscam.app.data.repository.TransferAccountRepository
 import com.anticyscam.app.domain.model.TransferAccount
 import com.anticyscam.app.domain.model.TransferAccountState
+import com.anticyscam.app.service.AppLauncher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +32,8 @@ class TransferAccountViewModel @Inject constructor(
     private val repository: TransferAccountRepository,
     private val clock: AntiScamClock,
     private val dailyTracker: DailyAddTracker,
-    private val tempUseTracker: TempUseTracker
+    private val tempUseTracker: TempUseTracker,
+    private val appLauncher: AppLauncher
 ) : ViewModel() {
 
     val accounts: StateFlow<List<TransferAccount>> = repository.observeAccounts()
@@ -143,27 +147,50 @@ class TransferAccountViewModel @Inject constructor(
     }
 
     /**
-     * Picker short-circuit for BAN states. Returns true when the caller MUST
-     * skip launching [TempUseGateActivity] and let the in-page [TempUseBannedOverlay]
-     * handle the user instead. Two cases:
-     *  - already in BANNED → overlay is already (or about to be) visible.
-     *  - in THIRD during the watchful window → next consume() escalates to
-     *    BAN. We commit that escalation here so the overlay shows immediately
-     *    on the next 1-sec tick instead of routing through the gate Activity
-     *    (which would render BAN full-screen and hide the tab bar).
-     *
-     * For every other stage (FIRST / SECOND / THIRD without watchful /
-     * LOCKED_OUT) the caller proceeds with the normal Gate Activity launch.
+     * Routes a "臨時用" account tap to one of three surfaces:
+     *  - [TempUseRoute.BANNED] — caller MUST NOT launch anything; the in-page
+     *    [TempUseBannedOverlay] handles the user. Collapses two cases: already
+     *    BANNED, or THIRD-during-watchful (escalated to BAN here so the overlay
+     *    raises on the next 1-sec tick instead of routing through the gate
+     *    Activity, which would render BAN full-screen and hide the tab bar).
+     *  - [TempUseRoute.STAGE1_DIALOG] — first hit in the 10-min window. Shown
+     *    as a lightweight in-app dialog (no full-screen takeover, no kiosk):
+     *    the user can only reach a bound app via 防詐器 anyway, so a gentle
+     *    reminder is enough at this stage.
+     *  - [TempUseRoute.GATE_ACTIVITY] — SECOND / THIRD-without-watchful /
+     *    LOCKED_OUT. These keep the full-screen [TempUseGateActivity]; the
+     *    forced-calm and lockdown stages need the kiosk takeover.
      */
-    fun tryShortCircuitForBan(): Boolean {
+    fun resolveTempUseRoute(): TempUseRoute {
         tempUseTracker.clearLockoutIfElapsed()
         val snap = tempUseTracker.snapshot()
-        if (snap.stage == TempUseTracker.Stage.BANNED) return true
+        if (snap.stage == TempUseTracker.Stage.BANNED) return TempUseRoute.BANNED
         if (snap.stage == TempUseTracker.Stage.THIRD && snap.watchfulUntil > 0L) {
             tempUseTracker.consume()
-            return true
+            return TempUseRoute.BANNED
         }
-        return false
+        return if (snap.stage == TempUseTracker.Stage.FIRST) {
+            TempUseRoute.STAGE1_DIALOG
+        } else {
+            TempUseRoute.GATE_ACTIVITY
+        }
+    }
+
+    /**
+     * Commits the first temp-use hit and launches the bound app. Mirrors the
+     * Stage 1 proceed path that previously lived in TempUseGateViewModel:
+     * consume() advances the 10-min counter, the account number is copied to
+     * the clipboard, then the target package is launched with authorization.
+     * Cancelling the dialog must NOT call this — keeping the attempt off the
+     * counter matches the old Activity's Stage-1 back-press behaviour.
+     */
+    fun consumeFirstAndLaunch(targetPackage: String?, accountNumber: String) {
+        tempUseTracker.consume()
+        if (accountNumber.isNotBlank()) {
+            val cm = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            cm?.setPrimaryClip(ClipData.newPlainText("transfer_account", accountNumber))
+        }
+        targetPackage?.let { appLauncher.launchAuthorized(it) }
     }
 
     private fun TransferAccountRepository.AddResult.toOutcome(): AddOutcome = when (this) {
@@ -183,6 +210,9 @@ class TransferAccountViewModel @Inject constructor(
         val account: TransferAccount,
         val state: TransferAccountState
     )
+
+    /** Where a temp-use account tap should be routed — see [resolveTempUseRoute]. */
+    enum class TempUseRoute { BANNED, STAGE1_DIALOG, GATE_ACTIVITY }
 
     /**
      * Drives the post-3rd escalation surfaces on the main screen. The two

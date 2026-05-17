@@ -23,6 +23,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -33,8 +35,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -53,6 +57,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.anticyscam.app.R
 import com.anticyscam.app.domain.model.BoundApp
 import com.anticyscam.app.domain.model.TransferAccount
@@ -60,8 +67,11 @@ import com.anticyscam.app.domain.model.TransferAccountState
 import com.anticyscam.app.ui.lockdown.DailyAddLockActivity
 import com.anticyscam.app.ui.tempuse.TempUseGateActivity
 import com.anticyscam.app.ui.theme.AlertYellow
+import com.anticyscam.app.ui.theme.SuccessGreen
 import com.anticyscam.app.ui.theme.SurfaceBlack
+import com.anticyscam.app.ui.theme.SurfaceElevated
 import com.anticyscam.app.ui.theme.TextPrimary
+import com.anticyscam.app.ui.theme.TextSecondary
 import com.anticyscam.app.ui.theme.WarningRed
 import com.anticyscam.app.ui.theme.WarningRedDark
 import kotlinx.coroutines.CoroutineScope
@@ -92,11 +102,36 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
     val pendingApp by mainViewModel.pendingApp.collectAsState()
     val tempUseUiState by transferViewModel.tempUseUiState.collectAsState()
 
+    // 權限閘門：「使用情況存取權」+「上層顯示」未開齊就擋整頁 —— 缺任一項，
+    // UsageStatsForegroundDetector 後備偵測形同虛設。兩項皆為特殊存取權、無
+    // 系統 callback，靠 onResume 重新讀取（使用者從系統設定授權後切回）。
+    val gateViewModel: MainGateViewModel = hiltViewModel()
+    val gateState by gateViewModel.gateState.collectAsState()
+    val gateLifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(gateLifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) gateViewModel.refresh()
+        }
+        gateLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { gateLifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    if (!gateState.allGranted) {
+        MainAccessGate(
+            usageStatsGranted = gateState.usageStatsGranted,
+            overlayGranted = gateState.overlayGranted,
+            onOpenUsageAccess = gateViewModel::openUsageAccessSettings,
+            onOpenOverlay = gateViewModel::openOverlaySettings
+        )
+        return
+    }
+
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var showAddDialog by remember { mutableStateOf(false) }
     var editingAccount by remember { mutableStateOf<TransferAccount?>(null) }
+    // 臨時用第 1 次：輕量 in-app 提醒 dialog（非全螢幕、不上 kiosk）。
+    var stage1Request by remember { mutableStateOf<Stage1Request?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val copiedMsg = stringResource(R.string.transfer_copied)
@@ -115,6 +150,7 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
             mainViewModel.cancelPending()
             showAddDialog = false
             editingAccount = null
+            stage1Request = null
         }
     }
 
@@ -190,7 +226,7 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
 
             Text(
                 text = stringResource(R.string.nav_main),
-                color = WarningRed,
+                color = AlertYellow,
                 style = MaterialTheme.typography.titleLarge
             )
 
@@ -279,7 +315,8 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
                     snackbarHostState = snackbarHostState,
                     scope = scope,
                     copiedMsg = copiedMsg,
-                    notInstalledMsg = notInstalledMsg
+                    notInstalledMsg = notInstalledMsg,
+                    onStage1Required = { stage1Request = it }
                 )
             },
             onDismiss = mainViewModel::cancelPending
@@ -308,7 +345,77 @@ fun MainFunctionScreen(onOpenBindApps: () -> Unit) {
             initialBankCode = account.bankCode.orEmpty()
         )
     }
+
+    stage1Request?.takeIf { !tempUseUiState.isBanned }?.let { req ->
+        TempUseStage1Dialog(
+            onProceed = {
+                transferViewModel.consumeFirstAndLaunch(req.targetPackage, req.accountNumber)
+                stage1Request = null
+            },
+            onDismiss = { stage1Request = null }
+        )
+    }
 }
+
+/**
+ * 臨時用第 1 次的「提醒」。原為 [TempUseGateActivity] 全螢幕 Stage 1，現降為
+ * in-app dialog：使用者本來就只能從防詐器進入綁定 App，第 1 次僅需溫和提醒，
+ * 不必整頁接管。Stage 2/3／封鎖仍走全螢幕 Activity。取消＝不計入 10 分鐘
+ * 視窗，與舊 Activity 的 Stage 1 返回鍵行為一致。
+ */
+@Composable
+private fun TempUseStage1Dialog(
+    onProceed: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceElevated,
+        titleContentColor = TextPrimary,
+        textContentColor = TextSecondary,
+        icon = {
+            Text(text = "🟢", style = MaterialTheme.typography.headlineMedium)
+        },
+        title = {
+            Text(
+                text = stringResource(R.string.temp_use_stage1_title),
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Text(
+                text = stringResource(R.string.temp_use_stage1_body),
+                style = MaterialTheme.typography.bodyMedium
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onProceed,
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SuccessGreen,
+                    contentColor = TextPrimary
+                )
+            ) {
+                Text(text = stringResource(R.string.temp_use_stage1_cta))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = stringResource(R.string.transfer_action_cancel),
+                    color = TextSecondary
+                )
+            }
+        }
+    )
+}
+
+/** 臨時用第 1 次 dialog 的啟動參數。targetPackage 為要開啟的綁定 App。 */
+private data class Stage1Request(
+    val targetPackage: String?,
+    val accountNumber: String
+)
 
 @Composable
 private fun BindAppsButton(onClick: () -> Unit) {
@@ -318,10 +425,10 @@ private fun BindAppsButton(onClick: () -> Unit) {
             .fillMaxWidth()
             .height(44.dp),
         shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(width = 2.dp, color = WarningRed),
+        border = BorderStroke(width = 2.dp, color = AlertYellow),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = SurfaceBlack,
-            contentColor = WarningRed
+            contentColor = AlertYellow
         )
     ) {
         Text(
@@ -396,27 +503,34 @@ private fun handlePickerSelection(
     snackbarHostState: SnackbarHostState,
     scope: CoroutineScope,
     copiedMsg: String,
-    notInstalledMsg: String
+    notInstalledMsg: String,
+    onStage1Required: (Stage1Request) -> Unit
 ) {
     val account = accountUi.account
     when (accountUi.state) {
         TransferAccountState.Default,
         is TransferAccountState.PendingMaturation -> {
             viewModel.cancelPending()
-            // BAN escalation must NOT route through TempUseGateActivity — that
-            // Activity covers the whole screen and hides the tab bar, defeating
-            // the in-page TempUseBannedOverlay that intentionally keeps
-            // 詐騙專區 / 設定 reachable. Commit the escalation locally and let
-            // the next 1-sec tick raise the overlay instead.
-            if (transferViewModel.tryShortCircuitForBan()) return
-            context.startActivity(
-                TempUseGateActivity.newIntent(
-                    context = context,
-                    targetPackage = app.packageName,
-                    accountId = if (account.isDefault) null else account.id,
-                    accountNumber = if (account.isDefault) "" else account.accountNumber
-                )
-            )
+            val accountNumber = if (account.isDefault) "" else account.accountNumber
+            when (transferViewModel.resolveTempUseRoute()) {
+                // BAN: do NOT launch anything — the in-page TempUseBannedOverlay
+                // handles the user, keeping 詐騙專區 / 設定 reachable. The next
+                // 1-sec tick raises the overlay.
+                TransferAccountViewModel.TempUseRoute.BANNED -> Unit
+                // 1st hit → lightweight in-app reminder dialog, no screen takeover.
+                TransferAccountViewModel.TempUseRoute.STAGE1_DIALOG ->
+                    onStage1Required(Stage1Request(app.packageName, accountNumber))
+                // Forced-calm / lockdown stages keep the full-screen kiosk Activity.
+                TransferAccountViewModel.TempUseRoute.GATE_ACTIVITY ->
+                    context.startActivity(
+                        TempUseGateActivity.newIntent(
+                            context = context,
+                            targetPackage = app.packageName,
+                            accountId = if (account.isDefault) null else account.id,
+                            accountNumber = accountNumber
+                        )
+                    )
+            }
         }
         TransferAccountState.Matured,
         is TransferAccountState.PendingDeletion -> {

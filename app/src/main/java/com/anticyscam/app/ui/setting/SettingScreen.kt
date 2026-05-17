@@ -87,7 +87,6 @@ fun SettingScreen() {
     val viewModel: SettingViewModel = hiltViewModel()
     val status by viewModel.status.collectAsState()
     val diagnostic by viewModel.diagnostic.collectAsState()
-    val serviceAlive by viewModel.accessibilityServiceAlive.collectAsState()
     val catalogMeta by viewModel.catalogMeta.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -123,20 +122,16 @@ fun SettingScreen() {
             item {
                 ProtectionStatusCard(
                     a11yEnabled = status.accessibilityEnabled,
-                    notificationsEnabled = status.notificationsEnabled,
                     usageStatsGranted = status.usageStatsGranted,
-                    boundAppCount = status.boundAppCount,
+                    overlayGranted = status.overlayPermissionGranted,
                     onOpenA11y = viewModel::openAccessibilitySettings,
-                    onOpenNotification = viewModel::openNotificationSettings,
-                    onOpenUsageAccess = viewModel::openUsageAccessSettings
+                    onOpenUsageAccess = viewModel::openUsageAccessSettings,
+                    onOpenOverlay = viewModel::requestOverlayPermission
                 )
             }
             item {
                 DiagnosticCard(
-                    serviceAlive = serviceAlive,
-                    overlayGranted = status.overlayPermissionGranted,
                     diagnostic = diagnostic,
-                    onRequestOverlay = viewModel::requestOverlayPermission,
                     onFireTestWarning = viewModel::fireTestWarning
                 )
             }
@@ -178,26 +173,24 @@ fun SettingScreen() {
 }
 
 /**
- * 防詐器保護設定卡（需求 #3、#4）。
+ * 防詐器保護設定卡（需求 #3）。
  *
- * 系統權限開關：無障礙服務、防詐通知。Android 不允許 App 直接代開這些系統
- * 權限，因此「開關」實際是狀態列 + 「前往啟用」捷徑，點下後跳系統設定。
- * 每項下方附說明文字解釋開啟後的效果；通知在「尚未綁定任何 App」時即使已授權
- * 也不會顯示，因此額外提示使用者先綁定 App。
+ * 三項系統權限：無障礙服務、使用情況存取權、上層顯示。Android 不允許 App
+ * 直接代開這些系統權限，因此「開關」實際是狀態列 +「前往啟用」捷徑，點下後
+ * 跳系統設定。每項下方附說明文字解釋開啟後的效果。
  *
- * 當無障礙服務未啟用時，額外顯示「使用情況存取權」區塊：這是 a11y-OFF 後備
- * 偵測（[com.anticyscam.app.service.UsageStatsForegroundDetector]）所需的特殊
- * 權限。a11y 一旦啟用即為最強模式，後備偵測停用，此區塊隱藏。
+ * 無障礙服務為最強模式；未開啟時改由「使用情況存取權 + 上層顯示」兩項一起
+ * 構成後備偵測（[com.anticyscam.app.service.UsageStatsForegroundDetector]），
+ * 因此三項一律顯示，方便使用者預先授權後備路徑。
  */
 @Composable
 private fun ProtectionStatusCard(
     a11yEnabled: Boolean,
-    notificationsEnabled: Boolean,
     usageStatsGranted: Boolean,
-    boundAppCount: Int,
+    overlayGranted: Boolean,
     onOpenA11y: () -> Unit,
-    onOpenNotification: () -> Unit,
-    onOpenUsageAccess: () -> Unit
+    onOpenUsageAccess: () -> Unit,
+    onOpenOverlay: () -> Unit
 ) {
     val borderColor = if (a11yEnabled) SuccessGreen else AlertYellow
     val border = remember(borderColor) { BorderStroke(1.dp, borderColor) }
@@ -231,33 +224,30 @@ private fun ProtectionStatusCard(
                 label = stringResource(R.string.gate_item_a11y),
                 description = stringResource(R.string.setting_feature_a11y_desc),
                 enabled = a11yEnabled,
-                onOpen = onOpenA11y
+                onOpen = onOpenA11y,
+                isWarning = true
             )
-            if (!a11yEnabled) {
-                ProtectionFeatureBlock(
-                    label = stringResource(R.string.setting_feature_usage),
-                    description = stringResource(R.string.setting_feature_usage_desc),
-                    enabled = usageStatsGranted,
-                    onOpen = onOpenUsageAccess
-                )
-            }
             ProtectionFeatureBlock(
-                label = stringResource(R.string.setting_feature_notify),
-                description = stringResource(R.string.setting_feature_notify_desc),
-                enabled = notificationsEnabled,
-                onOpen = onOpenNotification,
-                extraHint = if (notificationsEnabled && boundAppCount == 0) {
-                    stringResource(R.string.setting_feature_notify_no_app)
-                } else {
-                    null
-                }
+                label = stringResource(R.string.setting_feature_usage),
+                description = stringResource(R.string.setting_feature_usage_desc),
+                enabled = usageStatsGranted,
+                onOpen = onOpenUsageAccess
+            )
+            ProtectionFeatureBlock(
+                label = stringResource(R.string.setting_feature_overlay),
+                description = stringResource(R.string.setting_feature_overlay_desc),
+                enabled = overlayGranted,
+                onOpen = onOpenOverlay
             )
         }
     }
 }
 
 /**
- * 單一保護功能區塊：狀態列 +「開啟後效果」說明文字 + 選用的額外提示。
+ * 單一保護功能區塊：狀態列 +「開啟後效果」說明文字。
+ *
+ * [isWarning] 為 true 時，下方說明文字改用 [WarningRed] 紅色小字 —— 用於
+ * 無障礙服務這類「開啟後行為強烈、需提醒風險」的項目。
  */
 @Composable
 private fun ProtectionFeatureBlock(
@@ -265,22 +255,20 @@ private fun ProtectionFeatureBlock(
     description: String,
     enabled: Boolean,
     onOpen: () -> Unit,
-    extraHint: String? = null
+    isWarning: Boolean = false
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        ProtectionFeatureRow(label = label, enabled = enabled, onOpen = onOpen)
+        ProtectionFeatureRow(
+            label = label,
+            enabled = enabled,
+            onOpen = onOpen,
+            isWarning = isWarning
+        )
         Text(
             text = description,
-            color = TextSecondary,
+            color = if (isWarning) WarningRed else TextSecondary,
             style = MaterialTheme.typography.bodySmall
         )
-        if (extraHint != null) {
-            Text(
-                text = extraHint,
-                color = AlertYellow,
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
     }
 }
 
@@ -288,8 +276,12 @@ private fun ProtectionFeatureBlock(
 private fun ProtectionFeatureRow(
     label: String,
     enabled: Boolean,
-    onOpen: () -> Unit
+    onOpen: () -> Unit,
+    isWarning: Boolean = false
 ) {
+    // 未啟用時的提示色：無障礙服務（isWarning）維持紅色強調風險，
+    // 使用情況存取權／上層顯示則用黃色 —— 純屬後備權限，紅色過於危言聳聽。
+    val pendingColor = if (isWarning) WarningRed else AlertYellow
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -302,7 +294,7 @@ private fun ProtectionFeatureRow(
             Icon(
                 imageVector = if (enabled) Icons.Filled.CheckCircle else Icons.Filled.Warning,
                 contentDescription = null,
-                tint = if (enabled) SuccessGreen else WarningRed
+                tint = if (enabled) SuccessGreen else pendingColor
             )
             Text(
                 text = label,
@@ -320,7 +312,7 @@ private fun ProtectionFeatureRow(
             TextButton(onClick = onOpen) {
                 Text(
                     text = stringResource(R.string.gate_action_enable),
-                    color = WarningRed
+                    color = pendingColor
                 )
             }
         }
@@ -536,7 +528,7 @@ private fun FeedbackCard(onClick: () -> Unit) {
                 )
             }
             Text(
-                text = "回報誤判、想法或遇到的問題，幫助我們改善這個 App。",
+                text = "回報誤判、想法或遇到的問題，幫助我改善這個 App。",
                 color = TextSecondary,
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -633,22 +625,23 @@ private fun AboutCard(meta: SettingViewModel.CatalogMeta) {
     }
 }
 
+/**
+ * 診斷資訊卡 —— 純偵測紀錄。
+ *
+ * 權限狀態（無障礙服務／使用情況存取權／上層顯示）已集中在上方「防詐器保護
+ * 設定」卡，這裡不再重複；只保留前景偵測的即時紀錄與測試入口，供「綁定 App
+ * 直開卻沒跳警告」時排查。
+ */
 @Composable
 private fun DiagnosticCard(
-    serviceAlive: Boolean,
-    overlayGranted: Boolean,
     diagnostic: ForegroundAppGuard.Diagnostic,
-    onRequestOverlay: () -> Unit,
     onFireTestWarning: () -> Unit
 ) {
-    val allHealthy = serviceAlive && overlayGranted
-    val borderColor = if (allHealthy) SuccessGreen else AlertYellow
-    val border = remember(borderColor) { BorderStroke(1.dp, borderColor) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = SurfaceDim),
-        border = border
+        border = DividerCardBorder
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -660,23 +653,9 @@ private fun DiagnosticCard(
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                text = "若綁定 App 直開時沒跳警告，請依照以下狀態逐項排除：",
+                text = "若綁定 App 直開時沒跳警告，可參考下方最近偵測紀錄排查問題。",
                 color = TextSecondary,
                 style = MaterialTheme.typography.bodySmall
-            )
-            StatusRow(
-                label = "服務心跳",
-                ok = serviceAlive,
-                okText = "已連線",
-                failText = "尚未連線"
-            )
-            StatusRow(
-                label = "覆蓋層權限",
-                ok = overlayGranted,
-                okText = "已授權",
-                failText = "未授權",
-                onAction = if (!overlayGranted) onRequestOverlay else null,
-                actionText = "請求"
             )
             StatsRow(
                 label = "最近偵測前景",
@@ -714,39 +693,6 @@ private fun DiagnosticCard(
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = AlertYellow)
             ) {
                 Text(text = "測試警告畫面")
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatusRow(
-    label: String,
-    ok: Boolean,
-    okText: String,
-    failText: String,
-    onAction: (() -> Unit)? = null,
-    actionText: String? = null
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = label, color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = if (ok) okText else failText,
-                color = if (ok) SuccessGreen else WarningRed,
-                style = MaterialTheme.typography.bodyMedium
-            )
-            if (!ok && onAction != null && actionText != null) {
-                TextButton(onClick = onAction) {
-                    Text(text = actionText, color = AlertYellow)
-                }
             }
         }
     }

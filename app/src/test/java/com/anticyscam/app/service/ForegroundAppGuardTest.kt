@@ -17,9 +17,9 @@ import org.junit.Test
  * via [ForegroundAppGuard.primeSnapshotForTest], then exhaustively cover
  * the decision tree:
  *
- *   foreground == lastObserved    → Ignore (dedup)
  *   foreground == ownPkg           → Ignore (we're allowed)
  *   foreground !in snapshot        → Ignore (not bound)
+ *   foreground == active session   → AllowAuthorized (no grant consumed)
  *   foreground in snapshot + grant → AllowAuthorized
  *   foreground in snapshot + none  → BlockUnauthorized
  */
@@ -90,30 +90,33 @@ class ForegroundAppGuardTest {
     }
 
     @Test
-    fun `duplicate consecutive transitions are deduped`() {
+    fun `same-package transition within a session stays allowed`() {
         tracker.authorize(boundBank)
         // First time the package is observed: returns AllowAuthorized and
-        // consumes the grant.
+        // consumes the grant, opening a session.
         val first = guard.evaluate(foregroundPkg = boundBank, ownPkg = ownPkg)
         assertTrue(first is ForegroundAppGuard.Decision.AllowAuthorized)
-        // Second consecutive transition with the same package should be a
-        // no-op — even though there is no grant left, dedup must short-circuit
-        // BEFORE consuming the (non-existent) authorization, otherwise the
-        // user gets a spurious block on the very next WINDOW_STATE_CHANGED.
+        // A second consecutive transition with the same package — e.g. an
+        // in-app WINDOW_STATE_CHANGED — must NOT be blocked even though no
+        // grant is left: the active session keeps it AllowAuthorized.
         val second = guard.evaluate(foregroundPkg = boundBank, ownPkg = ownPkg)
-        assertEquals(ForegroundAppGuard.Decision.Ignore, second)
+        assertEquals(
+            ForegroundAppGuard.Decision.AllowAuthorized(boundBank),
+            second
+        )
     }
 
     @Test
-    fun `transition through a different package re-arms the same-package block`() {
+    fun `every unauthorized bound foreground blocks`() {
         // Visit bound bank without a grant → block.
         val first = guard.evaluate(foregroundPkg = boundBank, ownPkg = ownPkg)
         assertTrue(first is ForegroundAppGuard.Decision.BlockUnauthorized)
-        // Then visit Line (also unauthorized → block, lastObserved = line).
+        // Then Line, also unauthorized → block.
         val second = guard.evaluate(foregroundPkg = boundLine, ownPkg = ownPkg)
         assertTrue(second is ForegroundAppGuard.Decision.BlockUnauthorized)
-        // Bank again — since lastObserved is now line, this is NOT deduped
-        // and should re-block.
+        // Bank again — still no session, still unauthorized → block again.
+        // There is no same-package dedup, so a repeat entry (e.g. a
+        // gesture-nav quick-switch back to the bank app) is never skipped.
         val third = guard.evaluate(foregroundPkg = boundBank, ownPkg = ownPkg)
         assertTrue(third is ForegroundAppGuard.Decision.BlockUnauthorized)
     }
@@ -127,25 +130,22 @@ class ForegroundAppGuardTest {
     }
 
     @Test
-    fun `system overlay between bound transitions keeps session alive`() {
+    fun `switching to a non-bound app ends the session`() {
         // User taps bank from 防詐器 → grant consumed, session opened.
         tracker.authorize(boundBank)
         val enter = guard.evaluate(foregroundPkg = boundBank, ownPkg = ownPkg)
         assertTrue(enter is ForegroundAppGuard.Decision.AllowAuthorized)
 
-        // Mid-transaction, SystemUI/IME/OTP surface briefly steals focus.
-        val overlay = guard.evaluate(foregroundPkg = unrelated, ownPkg = ownPkg)
-        assertEquals(ForegroundAppGuard.Decision.Ignore, overlay)
+        // User genuinely switches away to another (non-bound) app.
+        val away = guard.evaluate(foregroundPkg = unrelated, ownPkg = ownPkg)
+        assertEquals(ForegroundAppGuard.Decision.Ignore, away)
 
-        // Bank window returns — no new grant has been issued, but the
-        // session must keep it allowed (this is the production bug fix:
-        // previously this path Blocked because consumeAuthorization had
-        // nothing left to consume).
+        // Returning to the bank without re-entering through 防詐器 is an
+        // unauthorized re-entry — the session ended when the user left, so
+        // this must block. (True transient system overlays never reach
+        // evaluate: they are filtered by IGNORED_PACKAGES in the service.)
         val resume = guard.evaluate(foregroundPkg = boundBank, ownPkg = ownPkg)
-        assertEquals(
-            ForegroundAppGuard.Decision.AllowAuthorized(boundBank),
-            resume
-        )
+        assertTrue(resume is ForegroundAppGuard.Decision.BlockUnauthorized)
     }
 
     @Test
