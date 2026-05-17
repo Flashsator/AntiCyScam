@@ -97,12 +97,8 @@ fun VoiceRecognitionScreen(
     ) {
         IntroCard(
             title = "電話語音辨識",
-            body = "上傳通話錄音檔（M4A / AAC / MP3 / AMR / WAV）。App 會用內建的中文語音辨識把對話轉成文字，再比對詐騙資料庫。\n\n⚠️ 通話結束自動偵測功能僅部分機種適用（小米／三星／OPPO／Vivo 等原廠支援自動錄音的機型）。\n\n🔒 完全離線運作，不需網路、不會上傳，安裝完即可使用。"
+            body = "上傳通話錄音檔（M4A / AAC / MP3 / AMR / WAV）。App 會用中文語音辨識把對話轉成文字，再比對詐騙資料庫。\n\n⚠️ 通話結束自動偵測功能僅部分機種適用（小米／三星／OPPO／Vivo 等原廠支援自動錄音的機型）。\n\n📥 首次使用會下載約 44 MB 的中文語音模型，需連網一次；下載後永久保存在本機。\n\n🔒 模型下載完成後即完全離線運作，辨識內容不會上傳。"
         )
-
-        EnableRecordingHowto()
-
-        AutoDetectCard()
 
         Button(
             onClick = { pickAudio.launch(AUDIO_MIME_TYPES) },
@@ -136,9 +132,13 @@ fun VoiceRecognitionScreen(
             )
         }
 
+        EnableRecordingHowto()
+
+        AutoDetectCard()
+
         TipsBlock(
             tips = listOf(
-                "首次使用會先解壓內建語音模型（約 5~10 秒），之後直接使用。",
+                "首次使用會下載中文語音模型（約 44 MB），需連網一次；之後辨識不需網路。",
                 "Android 系統不允許 App 直接擷取通話聲音，請使用手機內建的通話錄音功能。",
                 "辨識速度取決於錄音長度與裝置效能，10 分鐘的通話約 1~2 分鐘可完成。"
             )
