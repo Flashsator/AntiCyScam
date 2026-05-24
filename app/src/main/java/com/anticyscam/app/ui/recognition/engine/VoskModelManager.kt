@@ -38,7 +38,7 @@ object VoskModelManager {
      * 已由 [downloadTo] 的 instanceFollowRedirects 處理。
      */
     private const val MODEL_ZIP_URL =
-        "https://github.com/Flashsator/anticyscam-catalog/releases/download/" +
+        "https://github.com/Flashsator/AntiCyScam/releases/download/" +
             "vosk-model-cn-0.22/vosk-model-small-cn-0.22.zip"
 
     /** [MODEL_ZIP_URL] 指向檔案的預期 SHA-256（原打包進 APK 的同一份 zip）。 */

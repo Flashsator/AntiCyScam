@@ -84,3 +84,14 @@ Thumbs.db
 
 # Claude Code local config
 .claude/
+
+# catalog/ Python helpers
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ruff_cache/
+
+# catalog/ raw scrape dumps (re-derive via catalog/scripts/parse_wg117.py)
+catalog/data/cib_wg117_all.html
+catalog/data/cib_wg117_list_raw.html

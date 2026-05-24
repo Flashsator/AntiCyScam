@@ -1,0 +1,44 @@
+name: Scrape 165 + rebuild catalog
+
+on:
+  schedule:
+    # 週六 00:00 UTC = 週六 08:00 台灣
+    - cron: "0 0 * * 6"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: catalog
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install -r scripts/requirements.txt
+
+      - name: Scrape 165
+        run: python scripts/scrape_165.py
+
+      - name: Build catalog
+        run: python scripts/build_catalog.py
+
+      - name: Commit + push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scam_catalog.json version.json data/scraped_165.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore(cron): refresh catalog from 165 scrape"
+            git push
+          fi

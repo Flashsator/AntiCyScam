@@ -296,7 +296,7 @@ class AppUpdateChecker @Inject constructor(
 
     private companion object {
         const val APP_VERSION_URL =
-            "https://raw.githubusercontent.com/Flashsator/anticyscam-catalog/main/app_version.json"
+            "https://raw.githubusercontent.com/Flashsator/AntiCyScam/main/catalog/app_version.json"
         const val UPDATE_DIR = "update"
         const val APK_NAME = "anticyscam-update.apk"
         const val NET_TIMEOUT_MS = 15_000

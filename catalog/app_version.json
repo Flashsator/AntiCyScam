@@ -1,0 +1,8 @@
+{
+  "versionCode": 1,
+  "versionName": "v0.1.0",
+  "apkUrl": "https://github.com/Flashsator/AntiCyScam/releases/download/v0.1.0/AntiCyScam-v0.1.0-debug.apk",
+  "sha256": "83aaf50d4c5728bce981936d84205d0fd85a2eb3dba419e1c3f4b8f21adc5dfd",
+  "notes": "修正：開啟「使用情況存取權」與「上層顯示」兩項偵測權限即生效（不再受選用的通知權限影響）。",
+  "updatedAt": "2026-05-17"
+}

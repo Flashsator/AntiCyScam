@@ -322,9 +322,9 @@ class CatalogUpdateChecker @Inject constructor(
 
     private companion object {
         const val VERSION_URL =
-            "https://raw.githubusercontent.com/Flashsator/anticyscam-catalog/main/version.json"
+            "https://raw.githubusercontent.com/Flashsator/AntiCyScam/main/catalog/version.json"
         const val CATALOG_URL =
-            "https://raw.githubusercontent.com/Flashsator/anticyscam-catalog/main/scam_catalog.json"
+            "https://raw.githubusercontent.com/Flashsator/AntiCyScam/main/catalog/scam_catalog.json"
         const val OVERRIDE_FILE = "scam_catalog.json"
         const val OVERRIDE_TEMP = "scam_catalog.json.tmp"
         const val NET_TIMEOUT_MS = 15_000

@@ -196,19 +196,18 @@ utils/                — SystemAccessChecker、CallRecordingLauncher
 防詐專區的詐騙手法、警示帳戶與可疑名單來自一份伴生資料庫（catalog）：
 
 - APK 內建一份 `assets/scam_catalog.json` 作為出廠基準。
-- App 會定期從公開副倉檢查 `version.json`，發現新版時提示使用者一鍵更新；
+- App 會定期從本倉 [`catalog/`](catalog/) 檢查 `version.json`，發現新版時提示使用者一鍵更新；
   下載的覆蓋檔存於 `filesDir`，優先於內建版本。
 - 顯示版號採雙軌：機器整數 `version`（驅動更新偵測）與人類可讀的
   `displayVersion`（如 `v1.0.0`，類比 Android versionCode / versionName）。
 
-公開副倉：[anticyscam-catalog](https://github.com/Flashsator/anticyscam-catalog)
-（僅放資料與 APK，無原始碼）。
+詳細資料、腳本與更新流程說明見 [`catalog/README.md`](catalog/README.md)。
 
 ---
 
 ## App 內建更新
 
-App 啟動時（最多每 24h 一次）會檢查公開副倉的 `app_version.json`：
+App 啟動時（最多每 24h 一次）會檢查 `catalog/app_version.json`：
 
 - `versionCode` 比目前安裝版本大 → 跳對話框詢問是否更新。
 - 下載 APK 後以 `sha256` 驗證，再交給系統安裝程式（使用者仍需於系統確認安裝）。
