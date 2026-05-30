@@ -183,17 +183,6 @@ fun SettingScreen() {
                 HotlineCard(onDial = { dial165(context) })
             }
             item {
-                AppUpdateCard(
-                    currentVersion = BuildConfig.VERSION_NAME,
-                    onCheck = {
-                        viewModel.checkAppUpdate()
-                        scope.launch {
-                            snackbarHostState.showSnackbar("正在檢查 App 是否有新版…")
-                        }
-                    }
-                )
-            }
-            item {
                 FeedbackCard(onClick = { /* TODO: 接意見回饋送出邏輯 */ })
             }
             if (BuildConfig.DEBUG) {
@@ -210,6 +199,17 @@ fun SettingScreen() {
             }
             item {
                 AboutCard(meta = catalogMeta)
+            }
+            item {
+                AppUpdateCard(
+                    currentVersion = BuildConfig.VERSION_NAME,
+                    onCheck = {
+                        viewModel.checkAppUpdate()
+                        scope.launch {
+                            snackbarHostState.showSnackbar("正在檢查 App 是否有新版…")
+                        }
+                    }
+                )
             }
         }
     }
@@ -609,7 +609,7 @@ private fun AppUpdateCard(currentVersion: String, onCheck: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         shape = CardShape,
         colors = CardDefaults.cardColors(containerColor = SurfaceDim),
-        border = DividerCardBorder
+        border = AlertCardBorder
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -626,7 +626,7 @@ private fun AppUpdateCard(currentVersion: String, onCheck: () -> Unit) {
                 )
                 Text(
                     text = "App 更新",
-                    color = TextPrimary,
+                    color = AlertYellow,
                     style = MaterialTheme.typography.titleMedium
                 )
             }
