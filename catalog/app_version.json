@@ -1,8 +1,8 @@
 {
-  "versionCode": 1,
-  "versionName": "v0.1.0",
-  "apkUrl": "https://github.com/Flashsator/AntiCyScam/releases/download/v0.1.0/AntiCyScam-v0.1.0-debug.apk",
-  "sha256": "83aaf50d4c5728bce981936d84205d0fd85a2eb3dba419e1c3f4b8f21adc5dfd",
-  "notes": "修正：開啟「使用情況存取權」與「上層顯示」兩項偵測權限即生效（不再受選用的通知權限影響）。",
-  "updatedAt": "2026-05-17"
+  "versionCode": 2,
+  "versionName": "v0.2.0",
+  "apkUrl": "https://github.com/Flashsator/AntiCyScam/releases/download/v0.2.0/AntiCyScam-v0.2.0-debug.apk",
+  "sha256": "d052eef94cb9a5634df8033b341c792e726ab6bebfd71be8192641e1a3ea2871",
+  "notes": "修正「明明有網路卻無法更新」：更新檢查在 GitHub raw 被封鎖時自動改走 jsDelivr 鏡像，提高觸達率。",
+  "updatedAt": "2026-05-30"
 }
