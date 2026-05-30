@@ -8,8 +8,8 @@ name: Curate tactics (CIB + Claude/sonnet)
 
 on:
   schedule:
-    # 每月 1 號 01:00 UTC = 台灣 09:00
-    - cron: "0 1 1 * *"
+    # 每月 1 號 04:47 UTC = 台灣 12:47（離峰非整點）
+    - cron: "47 4 1 * *"
   workflow_dispatch: {}
 
 permissions:
@@ -22,13 +22,13 @@ jobs:
       run:
         working-directory: catalog
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
 

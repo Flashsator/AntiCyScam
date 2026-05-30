@@ -2,8 +2,8 @@ name: Scrape 165 + rebuild catalog
 
 on:
   schedule:
-    # 週六 00:00 UTC = 週六 08:00 台灣
-    - cron: "0 0 * * 6"
+    # 週六 04:17 UTC = 週六 12:17 台灣（離峰非整點）
+    - cron: "17 4 * * 6"
   workflow_dispatch: {}
 
 permissions:
@@ -16,9 +16,9 @@ jobs:
       run:
         working-directory: catalog
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
