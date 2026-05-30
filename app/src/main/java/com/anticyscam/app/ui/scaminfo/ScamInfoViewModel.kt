@@ -2,6 +2,7 @@ package com.anticyscam.app.ui.scaminfo
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.anticyscam.app.data.appupdate.AppUpdateChecker
 import com.anticyscam.app.data.catalog.CatalogUpdateChecker
 import com.anticyscam.app.data.repository.ScamInfoRepository
 import com.anticyscam.app.domain.model.EmergencyChannel
@@ -19,7 +20,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ScamInfoViewModel @Inject constructor(
     private val repository: ScamInfoRepository,
-    private val catalogUpdateChecker: CatalogUpdateChecker
+    private val catalogUpdateChecker: CatalogUpdateChecker,
+    private val appUpdateChecker: AppUpdateChecker
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ScamInfoState())
@@ -79,11 +81,15 @@ class ScamInfoViewModel @Inject constructor(
     }
 
     /**
-     * 使用者手動觸發更新檢查。實際 UI（更新對話框 / 無更新對話框 / 失敗對話框）
-     * 共用 MainActivity 內掛載的 [com.anticyscam.app.ui.catalog.CatalogUpdateDialog]，
-     * 這邊只負責呼叫 checker、結果透過共用的 StateFlow 流到對話框。
+     * 使用者手動觸發更新檢查。同時檢查 **App 本體**與**詐騙資料庫**：
+     *  - App 更新由 MainActivity 的 [com.anticyscam.app.ui.appupdate.AppUpdateDialog]
+     *    呈現，且具優先權（過舊的 binary 可能連資料庫對話框都畫不對）。
+     *  - 資料庫更新由 [com.anticyscam.app.ui.catalog.CatalogUpdateDialog] 呈現，
+     *    僅在 App 更新流程閒置時顯示。
+     * 兩者皆只負責呼叫 checker；結果透過各自的 StateFlow 流到對話框。
      */
     fun onCheckCatalogUpdate() {
+        appUpdateChecker.forceCheck()
         catalogUpdateChecker.forceCheck()
     }
 
