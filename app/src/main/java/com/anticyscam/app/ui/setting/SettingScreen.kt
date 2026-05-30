@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Feedback
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -180,6 +181,17 @@ fun SettingScreen() {
             }
             item {
                 HotlineCard(onDial = { dial165(context) })
+            }
+            item {
+                AppUpdateCard(
+                    currentVersion = BuildConfig.VERSION_NAME,
+                    onCheck = {
+                        viewModel.checkAppUpdate()
+                        scope.launch {
+                            snackbarHostState.showSnackbar("正在檢查 App 是否有新版…")
+                        }
+                    }
+                )
             }
             item {
                 FeedbackCard(onClick = { /* TODO: 接意見回饋送出邏輯 */ })
@@ -580,6 +592,57 @@ private fun FeedbackCard(onClick: () -> Unit) {
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = AlertYellow)
             ) {
                 Text(text = "提供意見")
+            }
+        }
+    }
+}
+
+/**
+ * App 本體更新卡。與詐騙資訊頁的「檢查更新」（只更新資料庫）刻意分開：
+ * 這裡檢查的是 App 安裝檔（APK）本身。按下後若有新版，會由 MainActivity 掛載
+ * 的共用 AppUpdateDialog 跳出「App 有新版本」流程；已是最新則跳「目前已是最新
+ * 版本」。
+ */
+@Composable
+private fun AppUpdateCard(currentVersion: String, onCheck: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = CardShape,
+        colors = CardDefaults.cardColors(containerColor = SurfaceDim),
+        border = DividerCardBorder
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Refresh,
+                    contentDescription = null,
+                    tint = AlertYellow
+                )
+                Text(
+                    text = "App 更新",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            Text(
+                text = "目前 App 版本 $currentVersion。檢查是否有新版本可安裝（與上方「防詐資料來源」的詐騙資料庫更新分開）。",
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            OutlinedButton(
+                onClick = onCheck,
+                modifier = Modifier.fillMaxWidth(),
+                shape = ButtonShape,
+                border = AlertCardBorder,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = AlertYellow)
+            ) {
+                Text(text = "檢查 App 更新")
             }
         }
     }

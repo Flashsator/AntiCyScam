@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.anticyscam.app.data.appupdate.AppUpdateChecker
 import com.anticyscam.app.data.catalog.CatalogUpdateChecker
 import com.anticyscam.app.data.repository.BoundAppRepository
 import com.anticyscam.app.data.repository.ScamInfoRepository
@@ -39,7 +40,8 @@ class SettingViewModel @Inject constructor(
     private val transferAccountRepository: TransferAccountRepository,
     private val foregroundAppGuard: ForegroundAppGuard,
     private val scamInfoRepository: ScamInfoRepository,
-    private val catalogUpdateChecker: CatalogUpdateChecker
+    private val catalogUpdateChecker: CatalogUpdateChecker,
+    private val appUpdateChecker: AppUpdateChecker
 ) : ViewModel() {
 
     private val batteryIgnored = MutableStateFlow(
@@ -166,6 +168,18 @@ class SettingViewModel @Inject constructor(
     fun requestOverlayPermission() {
         val intent = SystemAccessChecker.openOverlayPermissionIntent(appContext.packageName)
         runCatching { appContext.startActivity(intent) }
+    }
+
+    /**
+     * 使用者主動檢查 **App 本體**更新。實際 UI（有新版／已最新／失敗對話框）共用
+     * MainActivity 內掛載的 [com.anticyscam.app.ui.appupdate.AppUpdateDialog]，這裡
+     * 只負責呼叫 checker；結果透過共用的 StateFlow 流到對話框。
+     *
+     * 與詐騙資料庫更新（詐騙資訊頁的「檢查更新」）刻意分開：兩者來源、節奏、
+     * 安裝方式皆不同，混在同一顆按鈕會讓使用者搞不清楚更新的是什麼。
+     */
+    fun checkAppUpdate() {
+        appUpdateChecker.forceCheck()
     }
 
     /**
