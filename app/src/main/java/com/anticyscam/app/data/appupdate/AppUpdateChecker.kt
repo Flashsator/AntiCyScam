@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import android.util.Log
 import androidx.core.content.FileProvider
 import com.anticyscam.app.BuildConfig
 import com.anticyscam.app.data.prefs.AppUpdatePrefs
@@ -208,8 +209,21 @@ class AppUpdateChecker @Inject constructor(
     private fun updateApkFile(): File = File(File(context.cacheDir, UPDATE_DIR), APK_NAME)
 
     private suspend fun fetchVersionJson(): VersionMeta? = withContext(Dispatchers.IO) {
-        val body = runCatching { httpGetString(APP_VERSION_URL) }.getOrNull() ?: return@withContext null
-        runCatching { json.decodeFromString(VersionMeta.serializer(), body) }.getOrNull()
+        // 依序嘗試 GitHub raw → jsDelivr 鏡像。raw.githubusercontent.com 在部分台灣
+        // ISP／行動網路會被 DNS 汙染或間歇封鎖，換網域鏡像可提高觸達率。
+        // 注意：APK 本體仍走 GitHub Releases（jsDelivr 無法鏡像 release 附件），
+        // 但 apkUrl 下載後會做 sha256 驗證，完整性無虞。
+        for (url in APP_VERSION_URLS) {
+            val result = runCatching { httpGetString(url) }
+            val body = result.getOrNull()
+            if (body != null) {
+                return@withContext runCatching {
+                    json.decodeFromString(VersionMeta.serializer(), body)
+                }.getOrNull()
+            }
+            Log.w(TAG, "app version fetch failed: $url", result.exceptionOrNull())
+        }
+        null
     }
 
     private fun httpGetString(url: String): String {
@@ -295,8 +309,11 @@ class AppUpdateChecker @Inject constructor(
     }
 
     private companion object {
-        const val APP_VERSION_URL =
-            "https://raw.githubusercontent.com/Flashsator/AntiCyScam/main/catalog/app_version.json"
+        const val TAG = "AppUpdateChecker"
+        val APP_VERSION_URLS = listOf(
+            "https://raw.githubusercontent.com/Flashsator/AntiCyScam/main/catalog/app_version.json",
+            "https://cdn.jsdelivr.net/gh/Flashsator/AntiCyScam@main/catalog/app_version.json"
+        )
         const val UPDATE_DIR = "update"
         const val APK_NAME = "anticyscam-update.apk"
         const val NET_TIMEOUT_MS = 15_000

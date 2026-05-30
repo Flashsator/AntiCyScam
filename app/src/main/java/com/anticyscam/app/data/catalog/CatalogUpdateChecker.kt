@@ -1,6 +1,7 @@
 package com.anticyscam.app.data.catalog
 
 import android.content.Context
+import android.util.Log
 import com.anticyscam.app.data.prefs.CatalogUpdatePrefs
 import com.anticyscam.app.data.repository.ScamInfoRepository
 import com.anticyscam.app.domain.model.ScamCatalog
@@ -147,7 +148,7 @@ class CatalogUpdateChecker @Inject constructor(
         val tempFile = File(context.filesDir, OVERRIDE_TEMP)
         val finalFile = File(context.filesDir, OVERRIDE_FILE)
         val ok = runCatching {
-            downloadTo(CATALOG_URL, tempFile)
+            downloadToWithFallback(CATALOG_URLS, tempFile)
             val actualSha = sha256Of(tempFile)
             if (!actualSha.equals(available.sha256, ignoreCase = true)) {
                 throw IOException("sha256 mismatch: expected=${available.sha256} actual=$actualSha")
@@ -214,8 +215,34 @@ class CatalogUpdateChecker @Inject constructor(
     }
 
     private suspend fun fetchVersionJson(): VersionMeta? = withContext(Dispatchers.IO) {
-        val body = runCatching { httpGetString(VERSION_URL) }.getOrNull() ?: return@withContext null
+        val body = httpGetStringWithFallback(VERSION_URLS) ?: return@withContext null
         runCatching { json.decodeFromString(VersionMeta.serializer(), body) }.getOrNull()
+    }
+
+    /**
+     * 依序嘗試多個來源（GitHub raw → jsDelivr 鏡像）。`raw.githubusercontent.com`
+     * 在部分台灣 ISP／行動網路會被 DNS 汙染或間歇封鎖，導致「明明有網路卻更新失敗」。
+     * 換不同網域的鏡像可大幅提高觸達率。全部失敗才回傳 null。
+     */
+    private fun httpGetStringWithFallback(urls: List<String>): String? {
+        for (url in urls) {
+            val result = runCatching { httpGetString(url) }
+            result.getOrNull()?.let { return it }
+            Log.w(TAG, "catalog version fetch failed: $url", result.exceptionOrNull())
+        }
+        return null
+    }
+
+    /** 下載亦套用相同的鏡像 fallback；全部失敗才丟出，交給呼叫端標記為失敗。 */
+    private fun downloadToWithFallback(urls: List<String>, dest: File) {
+        var lastError: Throwable? = null
+        for (url in urls) {
+            val result = runCatching { downloadTo(url, dest) }
+            if (result.isSuccess) return
+            lastError = result.exceptionOrNull()
+            Log.w(TAG, "catalog download failed: $url", lastError)
+        }
+        throw IOException("all catalog mirrors failed", lastError)
     }
 
     private fun httpGetString(url: String): String {
@@ -321,10 +348,17 @@ class CatalogUpdateChecker @Inject constructor(
     )
 
     private companion object {
-        const val VERSION_URL =
-            "https://raw.githubusercontent.com/Flashsator/AntiCyScam/main/catalog/version.json"
-        const val CATALOG_URL =
-            "https://raw.githubusercontent.com/Flashsator/AntiCyScam/main/catalog/scam_catalog.json"
+        const val TAG = "CatalogUpdateChecker"
+        // 主來源 GitHub raw，鏡像 jsDelivr（不同網域 + 多 CDN，避開 raw 被汙染／封鎖）。
+        // 兩者都指向同一 repo 的 main，catalog 本體下載後仍會做 sha256 驗證，鏡像不影響完整性。
+        val VERSION_URLS = listOf(
+            "https://raw.githubusercontent.com/Flashsator/AntiCyScam/main/catalog/version.json",
+            "https://cdn.jsdelivr.net/gh/Flashsator/AntiCyScam@main/catalog/version.json"
+        )
+        val CATALOG_URLS = listOf(
+            "https://raw.githubusercontent.com/Flashsator/AntiCyScam/main/catalog/scam_catalog.json",
+            "https://cdn.jsdelivr.net/gh/Flashsator/AntiCyScam@main/catalog/scam_catalog.json"
+        )
         const val OVERRIDE_FILE = "scam_catalog.json"
         const val OVERRIDE_TEMP = "scam_catalog.json.tmp"
         const val NET_TIMEOUT_MS = 15_000
