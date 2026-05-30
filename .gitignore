@@ -95,3 +95,7 @@ venv/
 # catalog/ raw scrape dumps (re-derive via catalog/scripts/parse_wg117.py)
 catalog/data/cib_wg117_all.html
 catalog/data/cib_wg117_list_raw.html
+
+# catalog/ transient handoff file: fetch_cib_new.py -> Claude curate step.
+# Persistent state lives in data/cib_seen_sernos.json (the ledger), not here.
+catalog/data/cib_new_articles.json

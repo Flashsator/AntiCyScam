@@ -1,0 +1,81 @@
+name: Curate tactics (CIB + Claude/sonnet)
+
+# 第二條資料庫:詐騙手法(LLM 整理)。每月偵測 CIB「最新犯罪手法宣導」
+# 新文章,有新文章才喚醒 Claude(sonnet, headless)整理成手法條目並全自動發布。
+# 沒有新文章就整個略過,零 token。
+#
+# 需求:repo secret CLAUDE_CODE_OAUTH_TOKEN(本機跑 `claude setup-token` 產生)。
+
+on:
+  schedule:
+    # 每月 1 號 01:00 UTC = 台灣 09:00
+    - cron: "0 1 1 * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  curate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: catalog
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python deps
+        run: pip install -r scripts/requirements.txt
+
+      - name: Detect new CIB articles
+        id: fetch
+        run: python scripts/fetch_cib_new.py
+
+      - name: Install Claude Code
+        if: steps.fetch.outputs.new_count != '0'
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Curate tactics with Claude (sonnet)
+        if: steps.fetch.outputs.new_count != '0'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          cat CURATE_AGENT.md | claude -p \
+            --model sonnet \
+            --allowedTools "Read,Edit,Write" \
+            --permission-mode acceptEdits \
+            --max-turns 60
+
+      - name: Validate seed (hard gate — bad data never ships)
+        if: steps.fetch.outputs.new_count != '0'
+        run: python scripts/validate_seed.py
+
+      - name: Rebuild catalog + commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet seed/scam_catalog.json; then
+            echo "Seed unchanged — no tactic update."
+          else
+            cur=$(python -c "import json;print(json.load(open('version.json'))['displayVersion'])")
+            next=$(python -c "import re;m=re.match(r'v?(\d+)\.(\d+)\.(\d+)','$cur');a,b,c=map(int,m.groups());print(f'v{a}.{b+1}.0')")
+            echo "Tactics changed: $cur -> $next"
+            python scripts/build_catalog.py --display-version "$next"
+          fi
+
+          git add seed/scam_catalog.json scam_catalog.json version.json data/cib_seen_sernos.json
+          if git diff --staged --quiet; then
+            echo "Nothing to commit."
+          else
+            git commit -m "chore(cron): curate tactics from CIB (Claude/sonnet)"
+            git push
+          fi
