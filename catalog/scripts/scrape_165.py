@@ -156,7 +156,8 @@ def fetch_lineids() -> tuple[list[str], dict]:
     if valid_dates:
         anchor = max(d.replace(tzinfo=None) if d.tzinfo else d for d in valid_dates)
     else:
-        anchor = datetime.utcnow()
+        # Keep naive (tz-stripped) so it compares against alert_naive below.
+        anchor = datetime.now(timezone.utc).replace(tzinfo=None)
     cutoff = anchor - timedelta(days=LINEID_LOOKBACK_DAYS)
 
     kept: set[str] = set()
@@ -195,7 +196,7 @@ def fetch_fake_investment_sites() -> tuple[list[str], dict]:
     """
     text = _get_csv_text(FAKE_INVESTMENT_CSV_URL)
     reader = csv.DictReader(io.StringIO(text))
-    cutoff = (datetime.utcnow() - timedelta(days=SITES_LOOKBACK_DAYS)).date()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=SITES_LOOKBACK_DAYS)).date()
     kept: set[str] = set()
     raw_count = 0
     for row in reader:
@@ -229,7 +230,7 @@ def fetch_dns_blocked_sites() -> tuple[list[str], dict]:
     """
     text = _get_csv_text(DNS_BLOCKED_CSV_URL)
     reader = csv.DictReader(io.StringIO(text))
-    cutoff_dt = datetime.utcnow() - timedelta(days=SITES_LOOKBACK_DAYS)
+    cutoff_dt = datetime.now(timezone.utc) - timedelta(days=SITES_LOOKBACK_DAYS)
     cutoff_roc = (cutoff_dt.year - 1911) * 100 + cutoff_dt.month
     kept: set[str] = set()
     category_counts: dict[str, int] = {}
@@ -303,6 +304,11 @@ def main() -> int:
     if maxdate:
         source_meta["lineidMaxDate"] = maxdate
 
+    # NOTE: phones/accounts are best-effort regex harvest from 165 article
+    # body text only. 165 exposes no bulk phone/account dump (findFraudTel is
+    # keyword-search only), and scam articles rarely embed raw numbers, so
+    # these two fields are expected to be near-zero. That is by design, not a
+    # scrape failure — the real bulk signal is lineIds + the two CSV sources.
     article_text, article_sources = fetch_article_text()
     fetched_urls.extend(article_sources)
     if article_text:
