@@ -2,7 +2,7 @@
   "versionCode": 3,
   "versionName": "v0.3.0",
   "apkUrl": "https://github.com/Flashsator/AntiCyScam/releases/download/v0.3.0/AntiCyScam-v0.3.0-debug.apk",
-  "sha256": "fb6c97764e5474e5cc8df033d46c038ad69c536fc723b7d91573c448d160aa65",
-  "notes": "「檢查更新」按鈕現在會同時檢查 App 本體與詐騙資料庫，可隨時主動檢查 App 新版。",
+  "sha256": "1d41b42b7d65c169314cce9516d523133c4c266aed3f8c53de03cd787d37aef8",
+  "notes": "App 更新與詐騙資料庫更新拆成兩顆獨立按鈕：詐騙資訊頁的「檢查更新」只更新資料庫；設定頁新增「檢查 App 更新」檢查 App 本體新版。",
   "updatedAt": "2026-05-30"
 }
