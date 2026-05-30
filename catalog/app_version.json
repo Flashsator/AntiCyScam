@@ -1,8 +1,8 @@
 {
-  "versionCode": 2,
-  "versionName": "v0.2.0",
-  "apkUrl": "https://github.com/Flashsator/AntiCyScam/releases/download/v0.2.0/AntiCyScam-v0.2.0-debug.apk",
-  "sha256": "d052eef94cb9a5634df8033b341c792e726ab6bebfd71be8192641e1a3ea2871",
-  "notes": "修正「明明有網路卻無法更新」：更新檢查在 GitHub raw 被封鎖時自動改走 jsDelivr 鏡像，提高觸達率。",
+  "versionCode": 3,
+  "versionName": "v0.3.0",
+  "apkUrl": "https://github.com/Flashsator/AntiCyScam/releases/download/v0.3.0/AntiCyScam-v0.3.0-debug.apk",
+  "sha256": "fb6c97764e5474e5cc8df033d46c038ad69c536fc723b7d91573c448d160aa65",
+  "notes": "「檢查更新」按鈕現在會同時檢查 App 本體與詐騙資料庫，可隨時主動檢查 App 新版。",
   "updatedAt": "2026-05-30"
 }
