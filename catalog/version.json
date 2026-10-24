@@ -1,8 +1,8 @@
 {
-  "version": 24,
-  "displayVersion": "v1.0.23",
-  "sha256": "eb34087964926f1e69fa296b75f6947baad3493512780197184dd1569646b3d6",
-  "updatedAt": "2026-10-17T08:33:37+00:00",
-  "suspiciousNamesCount": 63011,
+  "version": 25,
+  "displayVersion": "v1.0.24",
+  "sha256": "ca93c7a6c9cc665bf1e812d007aaf3ef423b47c28ef84c5ccbd7e90ba0e41972",
+  "updatedAt": "2026-10-24T08:52:45+00:00",
+  "suspiciousNamesCount": 62864,
   "warnedAccountsCount": 1
 }
